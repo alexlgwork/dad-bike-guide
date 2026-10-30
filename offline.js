@@ -46,7 +46,7 @@ function pickFiles(pages, have) {
     if ((ii.width || 0) < 500 || BAD.test(p.title)) return;
     if (have.some((h) => h.src === ii.thumburl)) return;
     const em = ii.extmetadata || {};
-    out.push({ src: ii.thumburl, credit: strip(em.Artist && em.Artist.value) || 'Wikimedia Commons', lic: strip(em.LicenseShortName && em.LicenseShortName.value), page: ii.descriptionurl || '' });
+    out.push({ src: ii.thumburl, credit: strip(em.Artist && em.Artist.value) || 'Unknown author', lic: strip(em.LicenseShortName && em.LicenseShortName.value), page: ii.descriptionurl || '' });
   });
   return out;
 }

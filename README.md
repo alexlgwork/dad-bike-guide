@@ -5,7 +5,7 @@ Install it once on wifi, then it works with no signal.
 
 **Install:** open the site in Safari → Share → Add to Home Screen → open it from the Home Screen once and wait for "✅ Offline ready".
 
-Features: GPS, offline terrain map, landmark photos (Wikimedia Commons, downloaded once), search, food-type guesses, rider stops, photo spots, tonight's stay, three looks (Clean / Bright sun / Night), a photo sign reader,
+Features: GPS, offline terrain map, landmark photos (Wikimedia Commons, downloaded once), search, food-type guesses, rider stops, photo spots, tonight's stay, map-first navigation design with light and dark mode, a photo sign reader,
  "where am I" on the route (on/off the path, distance and direction back to it), stamp booths & landmarks,
 nearby food / convenience stores / lodging / bike shops / toilets, a Korean sign reader (uses iPhone Live Text "Scan Text"),
 phrase cards to show locals, emergency numbers, elevation profile, practice mode.

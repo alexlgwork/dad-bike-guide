@@ -6,246 +6,247 @@
 <title>Bike Korea</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Bike Korea">
-<meta name="theme-color" content="#0b4f8a">
+<meta name="theme-color" content="#0b2545">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header id="top">
-  <div class="brand">🚲 Seoul → Busan</div>
-  <div id="netbadge" class="badge">…</div>
-</header>
 
-<main>
-  <!-- WHERE AM I -->
-  <section id="v-where" class="view active">
-    <div id="gpsbox" class="card status">
-      <div id="st-line" class="st-big">Finding you…</div>
-      <div id="st-sub" class="st-sub">Allow location when asked. GPS works with no signal.</div>
-      <button id="btn-startgps" class="btn primary hidden">Turn on GPS</button>
+<!-- ============ RIDE (map) ============ -->
+<section id="v-ride" class="view active">
+  <canvas id="map"></canvas>
+
+  <div id="gpsbox" class="navbar">
+    <canvas id="arrow" width="112" height="112"></canvas>
+    <div class="nav-text">
+      <div id="st-line" class="nav-main">Finding your location</div>
+      <div id="st-sub" class="nav-sub">GPS works without a phone signal</div>
     </div>
+    <span id="netbadge" class="netbadge"></span>
+  </div>
+  <button id="btn-startgps" class="pill hidden">Turn on location</button>
 
-    <div class="card" id="pathcard">
-      <div class="row">
-        <canvas id="arrow" width="140" height="140" aria-label="direction to bike path"></canvas>
-        <div class="grow">
-          <div class="lbl">Bike path</div>
-          <div id="path-dist" class="big">—</div>
-          <div id="path-dir" class="sub">—</div>
+  <div class="fabs">
+    <button id="m-layers" class="fab" aria-label="Map layers"><i data-i="layers"></i></button>
+    <button id="m-in" class="fab" aria-label="Zoom in"><i data-i="plus"></i></button>
+    <button id="m-out" class="fab" aria-label="Zoom out"><i data-i="minus"></i></button>
+    <button id="m-all" class="fab" aria-label="Whole route"><i data-i="route"></i></button>
+    <button id="m-me" class="fab primary" aria-label="My location"><i data-i="locate"></i></button>
+  </div>
+  <div id="layers" class="popover hidden">
+    <div class="pop-title">Map</div>
+    <label class="tog"><span><i data-i="mountain"></i> Terrain</span><input type="checkbox" id="terrainchk" checked></label>
+    <label class="tog"><span><i data-i="food" class="c0"></i> Food</span><input type="checkbox" data-cat="0" checked></label>
+    <label class="tog"><span><i data-i="store" class="c2"></i> Convenience stores</span><input type="checkbox" data-cat="2" checked></label>
+    <label class="tog"><span><i data-i="bed" class="c3"></i> Places to stay</span><input type="checkbox" data-cat="3" checked></label>
+    <label class="tog"><span><i data-i="wrench" class="c4"></i> Bike shops</span><input type="checkbox" data-cat="4" checked></label>
+    <label class="tog"><span><i data-i="wc" class="c5"></i> Toilets</span><input type="checkbox" data-cat="5" checked></label>
+    <label class="tog"><span><i data-i="coffee" class="c1"></i> Cafés</span><input type="checkbox" data-cat="1"></label>
+    <p class="fine">Shops and beds appear when you zoom in.</p>
+  </div>
+
+  <div id="ridesheet" class="bsheet peek">
+    <div class="grab" id="grab"><span></span></div>
+    <div class="stats">
+      <div><b id="km-done">0</b><span>km ridden</span></div>
+      <div><b id="km-left">628</b><span>km to Busan</span></div>
+      <div><b id="next-km-short">—</b><span>km to next stop</span></div>
+    </div>
+    <div class="progress"><div id="progbar"></div></div>
+    <div class="quick">
+      <button data-q="0"><i data-i="food"></i><span>Food</span></button>
+      <button data-q="2"><i data-i="store"></i><span>Store</span></button>
+      <button data-q="3"><i data-i="bed"></i><span>Sleep</span></button>
+      <button data-q="4"><i data-i="wrench"></i><span>Bike shop</span></button>
+      <button data-q="5"><i data-i="wc"></i><span>Toilet</span></button>
+    </div>
+    <div class="sheet-scroll">
+      <div class="row-card tap" id="nextcard">
+        <div class="num" id="next-num">–</div>
+        <div class="rc-body">
+          <div class="over" id="next-lbl">Next stamp booth</div>
+          <div class="rc-title" id="next-name">—</div>
+          <div class="rc-ko" id="next-ko"></div>
+          <div class="rc-sub" id="next-km"></div>
         </div>
+        <i data-i="chev" class="chev"></i>
       </div>
-      <button id="btn-compass" class="btn small">🧭 Turn on compass arrow</button>
-    </div>
-
-    <div class="card" id="progcard">
-      <div class="lbl">Between stops</div>
-      <div id="between" class="mid">—</div>
-      <div class="progress"><div id="progbar"></div></div>
-      <div class="row space"><span id="km-done">0 km ridden</span><span id="km-left">628 km to Busan</span></div>
-    </div>
-
-    <div class="card tap" id="nextcard">
-      <div class="lbl" id="next-lbl">Next stop</div>
-      <div id="next-name" class="mid">—</div>
-      <div id="next-ko" class="ko">—</div>
-      <div id="next-km" class="sub">—</div>
-    </div>
-
-    <div class="card tap" id="lmcard">
-      <div class="lbl">Next landmark</div>
-      <div id="lm-name" class="mid">—</div>
-      <div id="lm-sub" class="sub">—</div>
-    </div>
-
-    <div class="card tap hidden" id="tonightcard">
-      <div class="lbl">🛏 Tonight's stay</div>
-      <div id="tonight-name" class="mid">—</div>
-      <div id="tonight-sub" class="sub">—</div>
-    </div>
-
-    <div class="card">
-      <div class="lbl">Closest to you</div>
+      <div class="row-card tap" id="lmcard">
+        <div class="thumb" id="lm-thumb"><i data-i="star"></i></div>
+        <div class="rc-body">
+          <div class="over">Next landmark</div>
+          <div class="rc-title" id="lm-name">—</div>
+          <div class="rc-sub" id="lm-sub"></div>
+        </div>
+        <i data-i="chev" class="chev"></i>
+      </div>
+      <div class="row-card tap hidden" id="tonightcard">
+        <div class="thumb c3bg"><i data-i="bed"></i></div>
+        <div class="rc-body">
+          <div class="over">Tonight's stay</div>
+          <div class="rc-title" id="tonight-name">—</div>
+          <div class="rc-sub" id="tonight-sub"></div>
+        </div>
+        <i data-i="chev" class="chev"></i>
+      </div>
+      <div class="section-title">Closest to you</div>
       <div id="closest" class="closest"></div>
+      <div class="section-title">Route status</div>
+      <div class="plain-card">
+        <div class="between" id="between">—</div>
+        <div class="rc-sub" id="path-dir"></div>
+        <div class="rc-sub" id="path-dist"></div>
+        <button id="btn-compass" class="btn ghost"><i data-i="compass"></i> Turn on compass arrow</button>
+      </div>
+      <div class="list-actions">
+        <button id="btn-showlocal"><i data-i="speech"></i><span>Show a local where I'm going</span><i data-i="chev" class="chev"></i></button>
+        <button id="btn-om"><i data-i="map"></i><span>Street map (Organic Maps)</span><i data-i="chev" class="chev"></i></button>
+        <button id="btn-wake"><i data-i="sun"></i><span id="wake-lbl">Keep screen on</span><i data-i="chev" class="chev"></i></button>
+        <button id="btn-dir"><i data-i="swap"></i><span id="dir-lbl">Riding toward Busan</span><i data-i="chev" class="chev"></i></button>
+      </div>
+      <p class="fine" id="gps-meta"></p>
     </div>
+  </div>
+</section>
 
+<!-- ============ SEARCH ============ -->
+<section id="v-near" class="view page">
+  <h1>Search</h1>
+  <div class="searchbox"><i data-i="search"></i><input id="search" type="search" placeholder="Food, motel, bike shop, 신륵사…" autocomplete="off"></div>
+  <div class="chips" id="chips">
+    <button data-cat="0" class="chip on"><i data-i="food"></i>Food</button>
+    <button data-cat="2" class="chip"><i data-i="store"></i>Stores</button>
+    <button data-cat="3" class="chip"><i data-i="bed"></i>Stay</button>
+    <button data-cat="4" class="chip"><i data-i="wrench"></i>Bike shops</button>
+    <button data-cat="7" class="chip"><i data-i="bike"></i>Rider stops</button>
+    <button data-cat="8" class="chip"><i data-i="camera"></i>Photo spots</button>
+    <button data-cat="6" class="chip"><i data-i="star"></i>Sights</button>
+    <button data-cat="5" class="chip"><i data-i="wc"></i>Toilets</button>
+    <button data-cat="1" class="chip"><i data-i="coffee"></i>Cafés</button>
+    <button data-cat="9" class="chip"><i data-i="hospital"></i>Hospital</button>
+  </div>
+  <div id="nearhead" class="fine"></div>
+  <div id="nearlist" class="list"></div>
+</section>
+
+<!-- ============ SIGNS ============ -->
+<section id="v-signs" class="view page">
+  <h1>Read a sign</h1>
+  <label class="btn primary big camerabtn"><i data-i="camera"></i> Take a photo of the sign
+    <input id="signphoto" type="file" accept="image/*" capture="environment" hidden>
+  </label>
+  <div id="photobox" class="hidden"><img id="signimg" alt="your photo"><div id="ocrstate" class="rc-sub"></div></div>
+  <div class="card">
+    <div class="card-title">Or scan / type the words</div>
+    <ol class="steps">
+      <li>Tap the box, then tap it <b>again</b>.</li>
+      <li>Choose <b>Scan Text</b> (newer iPhones: <b>AutoFill → Scan Text</b>).</li>
+      <li>Point at the sign and tap <b>Insert</b>.</li>
+    </ol>
+    <textarea id="signtext" rows="3" placeholder="Korean text goes here" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
     <div class="grid2">
-      <button class="btn big" id="btn-showlocal">🗣️ Show a local where I'm going</button>
-      <button class="btn big" id="btn-stops">📋 All stops & hills</button>
+      <button class="btn primary" id="btn-read">Read it</button>
+      <button class="btn" id="btn-clear">Clear</button>
     </div>
+  </div>
+  <div id="signresult"></div>
+  <p class="fine">For whole sentences, Apple's Translate app → Camera also works offline once Korean is downloaded.</p>
+  <div class="card">
+    <div class="card-title">Common sign shapes</div>
+    <div id="signgallery" class="gallery"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Dictionary</div>
+    <div class="searchbox small"><i data-i="search"></i><input id="wordfilter" type="search" placeholder="Search English or Korean"></div>
+    <div id="wordlist" class="wordlist"></div>
+  </div>
+</section>
+
+<!-- ============ ROUTE ============ -->
+<section id="v-route" class="view page">
+  <h1>Route</h1>
+  <div class="card">
+    <div class="card-title">Elevation</div>
+    <canvas id="elev" height="160"></canvas>
+    <p class="fine">Big climbs: Sojoryeong (km 238) and Ihwaryeong (km 249, the highest point). Short steep hills near km 478 and km 513. Walking the bike up is normal.</p>
+  </div>
+  <div id="stoplist" class="timeline"></div>
+  <p class="fine">Distances are approximate. The official length is about 633 km.</p>
+</section>
+
+<!-- ============ HELP ============ -->
+<section id="v-help" class="view page">
+  <h1>Help</h1>
+  <div class="card sos">
+    <div class="card-title">Emergency</div>
+    <a class="btn red big" href="tel:119"><i data-i="phone"></i> 119 Ambulance / Fire</a>
     <div class="grid2">
-      <button class="btn" id="btn-om">🗺 Street map (Organic Maps)</button>
-      <button class="btn" id="btn-wake">🔆 Keep screen on</button>
+      <a class="btn" href="tel:112"><i data-i="phone"></i> 112 Police</a>
+      <a class="btn" href="tel:+8221330"><i data-i="phone"></i> 1330 English</a>
     </div>
-    <div class="dir-toggle">Riding toward: <button id="btn-dir" class="btn small">Busan (south)</button></div>
-    <p class="fine" id="gps-meta"></p>
-  </section>
-
-  <!-- MAP -->
-  <section id="v-map" class="view">
-    <div id="mapwrap">
-      <canvas id="map"></canvas>
-      <div class="mapbtns">
-        <button id="m-in" class="mbtn">＋</button>
-        <button id="m-out" class="mbtn">－</button>
-        <button id="m-me" class="mbtn">◎</button>
-        <button id="m-all" class="mbtn">⤢</button>
-      </div>
-      <div id="maplegend" class="maplegend">
-        <label><input type="checkbox" id="terrainchk" checked> ⛰</label>
-        <label><input type="checkbox" data-cat="0" checked> 🍜</label>
-        <label><input type="checkbox" data-cat="2" checked> 🏪</label>
-        <label><input type="checkbox" data-cat="3" checked> 🛏</label>
-        <label><input type="checkbox" data-cat="4" checked> 🔧</label>
-        <label><input type="checkbox" data-cat="5" checked> 🚻</label>
-        <label><input type="checkbox" data-cat="1"> ☕</label>
-      </div>
-      <div id="mapnote" class="mapnote">Blue line = bike path · 🔴 stamp booth · ⭐ landmark · 📸 photo spot · ⛰ terrain. Zoom in for food, stores, beds.</div>
+    <button class="btn" id="btn-hosp"><i data-i="hospital"></i> Find a hospital</button>
+    <p class="fine">1330 is the 24/7 Korea Travel Hotline. They speak English and can join a call with 119 to interpret. From a US phone: +82-2-1330.</p>
+  </div>
+  <div class="card" id="dlcard">
+    <div class="card-title">Offline downloads</div>
+    <p class="rc-sub">Terrain, landmark photos and the sign reader. Do this once on wifi (≈ 40 MB).</p>
+    <div id="dlstat" class="rc-sub"></div>
+    <div class="progress"><div id="dlbar"></div></div>
+    <button class="btn primary" id="btn-dl"><i data-i="download"></i> Download now</button>
+  </div>
+  <div class="card">
+    <div class="card-title">My contacts</div>
+    <label class="fld">Son's name<input id="c-name" placeholder="Name"></label>
+    <label class="fld">Son's phone<input id="c-phone" type="tel" placeholder="+1 …"></label>
+    <label class="fld">Tonight's hotel (Korean name or address)<textarea id="c-hotel" rows="2" placeholder="Paste the Korean address"></textarea></label>
+    <div class="grid2">
+      <button class="btn" id="btn-showson">Show "Call my son"</button>
+      <button class="btn" id="btn-showhotel">Show "Take me here"</button>
     </div>
-  </section>
-
-  <!-- SIGNS -->
-  <section id="v-signs" class="view">
-    <div class="card">
-      <h2>Read a Korean sign</h2>
-      <label class="btn big primary camerabtn">📷 Take a photo of the sign
-        <input id="signphoto" type="file" accept="image/*" capture="environment" hidden>
-      </label>
-      <div id="photobox" class="hidden"><img id="signimg" alt="your photo"><div id="ocrstate" class="sub"></div></div>
-      <p class="sub" style="margin:10px 0 2px">Or type / scan the words:</p>
-      <ol class="steps">
-        <li>Tap the box below, then tap it <b>again</b>.</li>
-        <li>In the little menu tap <b>Scan Text</b> (newer iPhones: <b>AutoFill → Scan Text</b>).</li>
-        <li>Point at the sign, tap <b>Insert</b>.</li>
-      </ol>
-      <textarea id="signtext" rows="3" placeholder="Tap here, then Scan Text…" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
-      <div class="grid2">
-        <button class="btn primary" id="btn-read">Read it</button>
-        <button class="btn" id="btn-clear">Clear</button>
-      </div>
-      <div id="signresult"></div>
-      <p class="fine">For whole sentences, use Apple's <b>Translate</b> app → Camera. Korean downloaded = works offline.</p>
-    </div>
-    <div class="card">
-      <h2>Sign shapes &amp; colors</h2>
-      <div id="signgallery" class="gallery"></div>
-    </div>
-    <div class="card">
-      <h2>Word list</h2>
-      <input id="wordfilter" type="search" placeholder="Search English or Korean…">
-      <div id="wordlist" class="wordlist"></div>
-    </div>
-  </section>
-
-  <!-- NEARBY -->
-  <section id="v-near" class="view">
-    <input id="search" type="search" placeholder="🔍 Search: chicken, motel, bike shop, 신륵사…" autocomplete="off">
-    <div class="chips" id="chips">
-      <button data-cat="0" class="chip on">🍜 Food</button>
-      <button data-cat="2" class="chip">🏪 Store</button>
-      <button data-cat="3" class="chip">🛏 Sleep</button>
-      <button data-cat="4" class="chip">🔧 Bike shop</button>
-      <button data-cat="5" class="chip">🚻 Toilet</button>
-      <button data-cat="1" class="chip">☕ Café</button>
-      <button data-cat="7" class="chip">🚴 Rider stops</button>
-      <button data-cat="8" class="chip">📸 Photo spots</button>
-      <button data-cat="6" class="chip">⭐ Sights</button>
-      <button data-cat="9" class="chip">🏥 Hospital</button>
-    </div>
-    <div id="nearhead" class="fine"></div>
-    <div id="nearlist"></div>
-  </section>
-
-  <!-- ROUTE -->
-  <section id="v-route" class="view">
-    <div class="card">
-      <h2>Hills on the way</h2>
-      <canvas id="elev" height="170"></canvas>
-      <p class="fine">Height above sea level. The red line is you. Big climbs: Sojoryeong (≈km 238) and Ihwaryeong (≈km 249, highest point). Short steep hills after Hapcheon-Changnyeong Weir (≈km 478) and near Namji (≈km 513). Walking the bike up is normal.</p>
-    </div>
-    <div id="stoplist"></div>
-    <p class="fine">Distances are approximate. The official length is about 633 km.</p>
-  </section>
-
-  <!-- HELP -->
-  <section id="v-help" class="view">
-    <div class="card" id="dlcard">
-      <h2>⬇️ Download for offline</h2>
-      <p class="sub">Terrain map, landmark photos and the sign reader. Do this once on wifi (≈ 40 MB).</p>
-      <div id="dlstat" class="sub"></div>
-      <div class="progress"><div id="dlbar"></div></div>
-      <button class="btn primary big" id="btn-dl">Download now</button>
-    </div>
-    <div class="card">
-      <h2>🎨 Look</h2>
-      <div class="grid3" id="themes">
-        <button class="btn" data-theme="clean">Clean</button>
-        <button class="btn" data-theme="sun">Bright sun</button>
-        <button class="btn" data-theme="night">Night</button>
-      </div>
-    </div>
-    <div class="card sos">
-      <h2>Emergency</h2>
-      <a class="btn big red" href="tel:119">🚑 119 Ambulance / Fire</a>
-      <a class="btn big" href="tel:112">🚓 112 Police</a>
-      <a class="btn big" href="tel:+8221330">📞 1330 English help (24/7)</a>
-      <p class="fine">1330 is the Korea Travel Hotline. They speak English and can join a call with 119 to interpret. On a US phone dial +82-2-1330.</p>
-      <button class="btn big" id="btn-hosp">🏥 Find a hospital near me</button>
-    </div>
-    <div class="card">
-      <h2>My contacts</h2>
-      <label class="fld">Son's name <input id="c-name" placeholder="e.g. Alex"></label>
-      <label class="fld">Son's phone <input id="c-phone" type="tel" placeholder="+1 …"></label>
-      <label class="fld">Tonight's hotel (name or address in Korean) <textarea id="c-hotel" rows="2" placeholder="Paste the Korean address here"></textarea></label>
-      <div class="grid2">
-        <button class="btn" id="btn-showson">Show: "Call my son"</button>
-        <button class="btn" id="btn-showhotel">Show: "Take me here"</button>
-      </div>
-    </div>
-    <div id="phrases"></div>
-    <div class="card">
-      <h2>Practice mode</h2>
-      <p class="sub">Pretend you're at a stop to see how the app works at home.</p>
-      <select id="sim"></select>
-      <button class="btn" id="btn-simoff">Use real GPS</button>
-    </div>
-    <div class="card">
-      <h2>Before the trip (one time, on wifi)</h2>
-      <ol class="steps small">
-        <li>Open this page in <b>Safari</b> → Share → <b>Add to Home Screen</b>. Open it from the Home Screen once, wait for <b>✅ Offline ready</b> at the top.</li>
-        <li>Allow <b>Location</b> (Settings → Privacy → Location Services).</li>
-        <li><b>Translate</b> app: download <b>Korean</b> and <b>English</b> for offline use.</li>
-        <li>Settings → General → Language &amp; Region → <b>Live Text</b> on.</li>
-        <li>Help tab → <b>Download now</b> (terrain, photos, sign reader).</li>
-        <li>Install <b>Organic Maps</b> and download the South Korea map (street map + hospitals, offline).</li>
-        <li>Bring a power bank. GPS uses battery.</li>
-      </ol>
-    </div>
-    <p class="fine">Map data © OpenStreetMap contributors (ODbL), via the open project github.com/HAGUANGHO/korea-bicycle-road-site. Shop &amp; lodging data: Korea public data portal. Elevation: NASA SRTM. Places can close — check before you rely on one.</p>
-  </section>
-</main>
+  </div>
+  <div id="phrases"></div>
+  <div class="card">
+    <div class="card-title">Settings</div>
+    <label class="tog"><span><i data-i="moon"></i> Dark mode</span><input type="checkbox" id="darkchk"></label>
+    <label class="fld">Practice mode (pretend you're at a stop)<select id="sim"></select></label>
+    <button class="btn" id="btn-simoff">Use real GPS</button>
+  </div>
+  <div class="card">
+    <div class="card-title">Before the trip (once, on wifi)</div>
+    <ol class="steps small">
+      <li>Open in <b>Safari</b> → Share → <b>Add to Home Screen</b>. Open it from the Home Screen and wait for <b>Offline ready</b>.</li>
+      <li>Help → <b>Download now</b> (terrain, photos, sign reader).</li>
+      <li>Allow <b>Location</b> when asked.</li>
+      <li><b>Translate</b> app: download Korean and English.</li>
+      <li>Settings → General → Language &amp; Region → <b>Live Text</b> on.</li>
+      <li>Install <b>Organic Maps</b> and download the South Korea map.</li>
+      <li>Bring a power bank.</li>
+    </ol>
+  </div>
+  <p class="fine">Map data © OpenStreetMap contributors (ODbL) via github.com/HAGUANGHO/korea-bicycle-road-site · shops &amp; lodging: Korea public data portal · elevation: NASA SRTM, Mapzen Terrain Tiles · photos: Wikimedia Commons. Places can close — check before relying on one.</p>
+</section>
 
 <nav id="tabs">
-  <button data-v="where" class="on">📍<span>Where</span></button>
-  <button data-v="map">🗺<span>Map</span></button>
-  <button data-v="signs">🔤<span>Signs</span></button>
-  <button data-v="near">🍜<span>Nearby</span></button>
-  <button data-v="route">📋<span>Route</span></button>
-  <button data-v="help">🆘<span>Help</span></button>
+  <button data-v="ride" class="on"><i data-i="nav"></i><span>Ride</span></button>
+  <button data-v="near"><i data-i="search"></i><span>Search</span></button>
+  <button data-v="signs"><i data-i="translate"></i><span>Signs</span></button>
+  <button data-v="route"><i data-i="flag"></i><span>Route</span></button>
+  <button data-v="help"><i data-i="help"></i><span>Help</span></button>
 </nav>
 
 <div id="sheet" class="sheet hidden">
   <div class="sheet-in">
-    <button class="close" id="sheet-x">✕</button>
+    <button class="close" id="sheet-x" aria-label="Close"><i data-i="close"></i></button>
     <div id="sheet-body"></div>
   </div>
 </div>
 
 <div id="show" class="show hidden">
-  <button class="close light" id="show-x">✕</button>
+  <button class="close" id="show-x" aria-label="Close"><i data-i="close"></i></button>
   <div id="show-ko" class="show-ko"></div>
   <div id="show-en" class="show-en"></div>
 </div>
@@ -254,6 +255,7 @@
 <script src="words.js"></script>
 <script src="food.js"></script>
 <script src="offline.js"></script>
+<script src="icons.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
