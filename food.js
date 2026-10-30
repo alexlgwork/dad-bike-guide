@@ -41,6 +41,7 @@ const TYPES = [
   [/반점|중화|짜장|짬뽕|중국|차이나|마라|양꼬치|훠궈/, '🥟', 'Chinese-Korean (black-bean noodles, fried rice)'],
   [/횟집|회센터|활어|수산|물회|회타운|초장/, '🐟', 'Raw fish (sashimi) & seafood'],
   [/추어|어탕|매운탕|민물|메기|빠가/, '🍲', 'River-fish stew (spicy)'],
+  [/곰장어|꼼장어|먹장어/, '🐟', 'Hagfish (spicy grilled, a Busan favourite)'],
   [/장어/, '🐟', 'Grilled eel'],
   [/갈비|고기|삼겹|정육|숯불|한우|돼지|생고기|구이|목살|막창|곱창|불고기|소금구이/, '🥩', 'Korean BBQ (grill meat at the table)'],
   [/국밥|순대|해장국|설렁탕|곰탕|감자탕|뼈|선지|육개장|갈비탕/, '🍲', 'Hot soup with rice'],

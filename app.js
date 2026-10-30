@@ -113,6 +113,10 @@ const omRoute = (lat, lng, name) => { const h = here(); return h ? `om://route?v
 const omSearch = (q) => { const h = here(); const ll = h ? `cll=${h.lat.toFixed(5)},${h.lng.toFixed(5)}&` : ''; return `om://search?${ll}query=${encodeURIComponent(q)}&locale=en`; };
 const gmaps = (name, lat, lng) => `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat.toFixed(5)},${lng.toFixed(5)},17z`;
 const nmaps = (name, lat, lng) => `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${lng.toFixed(5)},${lat.toFixed(5)},16,0,0,0,dh`;
+// Province and city/county of the nearest stamp booth, from its address, e.g. ['경상북도', '구미시'].
+const areaOf = (lat, lng) => { let best = C[0], bd = 1e9; C.forEach((c) => { const d = hav(lat, lng, c.lat, c.lng); if (d < bd) { bd = d; best = c; } }); return (best.addr || '').split(' '); };
+// Google Maps hotel search at this spot: lists this place and the ones around it with tonight's prices from the booking sites.
+const ghotels = (lat, lng) => `https://www.google.com/maps/search/hotels/@${lat.toFixed(5)},${lng.toFixed(5)},16z`;
 const descOf = (o) => (window.FOOD ? window.FOOD.describe(o.name, o.cat) : { en: o.name, type: null });
 
 const PHOTO = {
@@ -173,15 +177,144 @@ const TOWN_BEDS = [
 ];
 const townBedsNear = (lat, lng) => { let best = null, bd = 18; TOWN_BEDS.forEach((t) => { const c = C[t.stop - 1]; const d = hav(lat, lng, c.lat, c.lng); if (d < bd) { bd = d; best = t; } }); return best; };
 const riderPick = (o) => RIDER_STAYS.find((r) => r.name === o.name && Math.abs(r.lat - o.lat) < 0.002 && Math.abs(r.lng - o.lng) < 0.002);
-// Typical food prices (2026 travel guides) — only where we have a source.
-const FOODPRICE = { 'Korean restaurant': 'A meal like bibimbap: about ₩10,000–16,000', 'Korean home-style meals with side dishes': 'About ₩10,000–16,000 per person', 'Korean fried chicken': 'A whole chicken: about ₩18,000–28,000', 'Café': 'Coffee about ₩5,000–8,000' };
+// Shortlist: the 3–4 best stays in each overnight town, with the nightly price seen on booking sites (month in `seen`).
+// bikes: true = a source says bikes can be kept indoors, false = not in the rooms, null = unknown (ask).
+// Researched Oct 2026 from Yeogi-eottae / Yanolja listings and 국토종주 rider reports.
+const TOP_STAYS = [
+  { town: 'Yangpyeong', name: '지오모텔', en: null, lat: 37.48968, lng: 127.47723, price: '₩30,000–35,000', seen: 'May 2026', src: 'Yeogi-eottae', bikes: null, note: '1.1 km from the Yangpyeong stamp booth across the river in Gangsang-myeon; 2025–26 riders say the owners store bikes and do laundry for them.' },
+  { town: 'Yangpyeong', name: '뉴욕모텔', en: 'New York Motel', lat: 37.48766, lng: 127.48116, price: '₩50,000–65,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: '1.2 km from the booth on the south bank with river views; riders report bikes kept in the lobby or in a ground-floor room.' },
+  { town: 'Yangpyeong', name: '티파니모텔', en: 'Tiffany Motel', lat: 37.49122, lng: 127.49051, price: '₩60,000–70,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: false, note: '4 min walk from Yangpyeong Station near the market; bikes are not allowed in rooms (staff cover and store them) and there is no lift.' },
+  { town: 'Yeoju', name: '리버스호텔', en: 'Reverse Hotel', lat: 37.29213, lng: 127.65522, price: '₩50,000–70,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Sells a "rider room" (라이더룸) on Yeogi, and an Apr 2026 cross-country rider was allowed to keep the bike in the room.' },
+  { town: 'Yeoju', name: '여주여행자센터', en: 'Yeoju Traveler Center', lat: 37.29937, lng: 127.65492, price: '₩25,000–30,000 per person (dorm)', seen: 'Jun 2025', src: 'a news article', bikes: true, note: 'Public cyclist hostel by Silleuksa temple with indoor bike storage, repair tools and free laundry; shared men’s/women’s rooms, no lift, check-in 15:00–21:00, tel 031-884-9088.' },
+  { town: 'Yeoju', name: '프린스', en: 'Prince Motel', lat: 37.29725, lng: 127.63644, price: '₩40,000–45,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Downtown Yeoju by City Hall and the market, with many restaurants; an Oct 2026 rider review mentions a washing machine.' },
+  { town: 'Yeoju', name: '썬모텔', en: 'Sun Motel', lat: 37.29179, lng: 127.65783, price: '₩40,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Owner says it is very close to the bike path; 2025–26 riders report easy bike storage and clothes washing, with a convenience store in front.' },
+  { town: 'Angseong (Binaeseom)', name: '휴드라이브인텔', en: 'Hue Drive-in', lat: 37.08752, lng: 127.80233, price: '₩60,000–70,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Drive-in motel near Angseong Oncheon station, 2.6 km from Binaeseom; each room has its own closed garage where riders keep their bikes.' },
+  { town: 'Angseong (Binaeseom)', name: '이든포레호텔', en: 'Eden Foret Hotel', lat: 37.09018, lng: 127.79927, price: '₩90,000–110,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Hotel with a lift and luggage storage in the Angseong hot-spring village, 2.4 km from Binaeseom; beef restaurants and a market nearby.' },
+  { town: 'Chungju', name: '토론토 호텔', en: 'Toronto Hotel', lat: 36.97569, lng: 127.91064, price: '₩45,000–60,000 (weekdays)', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, extra: true, note: 'Near Chungju Station 1.7 km from Tangeumdae; riders call it a cross-country favourite and get larger rooms to keep bikes inside (one was charged extra for a deluxe room).' },
+  { town: 'Chungju', name: '루엠호텔', en: null, lat: 36.9744, lng: 127.90989, price: '₩52,000 (weekdays)', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, extra: true, note: 'Near Chungju Station 1.8 km from Tangeumdae; guest washer/dryer and simple breakfast, and a rider kept his bike in the large bathroom.' },
+  { town: 'Chungju', name: 'No.25 호텔', en: 'No.25 Hotel', lat: 36.97423, lng: 127.91191, price: '₩50,000–75,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, extra: true, note: 'Near Chungju Station 1.8 km from Tangeumdae; an Oct 2026 cross-country rider reports an easy washer/dryer and bikes kept in the corridor.' },
+  { town: 'Chungju', name: '헤라모텔', en: 'Hera Motel', lat: 37.02518, lng: 127.91927, price: '₩35,000–40,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Budget motel with 2026 rider reviews, but 4 km north-east of Tangeumdae across the river in Dongnyang-myeon, away from the southbound route.' },
+  { town: 'Suanbo hot springs', name: '수안보온천수호텔', en: 'Suanbo Hot Spring Water Hotel', lat: 36.84546, lng: 127.99164, price: '₩50,000 (weekdays)', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Hot-spring water in the room baths, 0.4 km from the booth; riders report bikes allowed in rooms or the ground-floor lobby, and a washing machine.' },
+  { town: 'Suanbo hot springs', name: '스크린호텔', en: 'Hotel Screen', lat: 36.84635, lng: 127.98699, price: '₩70,000–90,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: '0.3 km from the booth; a Nov 2024 rider took the bike up in the large lift and kept it in the room, and some rooms have hinoki hot-spring tubs.' },
+  { town: 'Suanbo hot springs', name: '밀라노호텔', en: 'Milano Hotel', lat: 36.84494, lng: 127.99074, price: '₩55,000–88,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: '0.4 km from the booth; riders call it bike-friendly with room to store bikes, though a May 2026 guest found the hot-spring water not very hot.' },
+  { town: 'Suanbo hot springs', name: '사이판온천호텔', en: 'Suanbo Saipan Hot Spring Hotel', lat: 36.8465, lng: 127.98793, price: '₩41,000–61,000', seen: 'Oct 2026', src: 'HotelsCombined', bikes: null, note: 'Korea by Bike’s Suanbo pick, 0.3 km from the booth in the hot-spring centre; laundry facilities are listed.' },
+  { town: 'Yeonpung (before Ihwaryeong)', name: '새재파크여관', en: 'Saejae Park Hotel', lat: 36.76584, lng: 127.99512, price: '₩40,000', seen: 'Aug 2026', src: 'a rider’s blog', bikes: true, note: 'Old inn in Yeonpung village at the Saejae/Ocheon path junction before the Ihwaryeong climb; same price at weekends, and bikes go in some rooms or are locked inside the ground-floor entrance.' },
+  { town: 'Yeonpung (before Ihwaryeong)', name: '문경아리랑호텔', en: 'Mungyeong Arirang Hotel', lat: 36.72859, lng: 128.109, price: '₩50,000–70,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Over the pass in Mungyeong-eup hot-spring town, 7.4 km from the Ihwaryeong booth; riders praise the cleanliness and the hot-spring-water baths.' },
+  { town: 'Yeonpung (before Ihwaryeong)', name: '강남모텔', en: 'Gangnam Motel', lat: 36.72972, lng: 128.10992, price: '₩50,000–60,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Recently remodelled motel in Mungyeong-eup 7.4 km past the pass; bikes are not allowed in rooms but are kept indoors by the front desk or stairs.' },
+  { town: 'Mungyeong · Jeomchon', name: '퀸모텔', en: 'Queen Motel', lat: 36.5999, lng: 128.2037, price: '₩40,000–50,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'In Jeomchon town 8.4 km from Buljeong Station; riders keep bikes inside the entrance and the owners wash cycling clothes.' },
+  { town: 'Mungyeong · Jeomchon', name: '스타호텔', en: 'Star Hotel', lat: 36.59763, lng: 128.20317, price: '₩55,000–75,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Jeomchon town centre, 8.5 km from Buljeong Station; the room rate includes breakfast.' },
+  { town: 'Mungyeong · Jeomchon', name: 'E모텔', en: 'E Motel', lat: 36.59756, lng: 128.20309, price: '₩35,000–40,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Budget motel next door to Star Hotel in Jeomchon town centre; not every room has a bathtub, so ask if you want one.' },
+  { town: 'Mungyeong · Jeomchon', name: '진욱이별장자전거게스트하우스', en: 'Jinwook’s Villa Bicycle Guesthouse', lat: 36.69306, lng: 128.12129, price: '₩30,000 per person (dorm)', seen: 'Oct 2026', src: 'Naver Map', bikes: null, note: 'Cyclist guesthouse in Maseong-myeon, 4.5 km north of the Buljeong Station booth; shared men’s and women’s rooms with floor mattresses, tel 0507-1382-7886.' },
+  { town: 'Sangju', name: '객주촌 한옥펜션', en: 'Gaekjuchon Hanok Pension', lat: 36.44344, lng: 128.26543, price: '₩150,000+', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'City-owned hanok pension facing Sangju Weir and Gyeongcheon Island, 1.9 km from the stamp booth; rooms are family-size and priced accordingly.' },
+  { town: 'Sangju', name: '휴하우스민박', en: 'Hue House', lat: 36.45617, lng: 128.25074, price: '₩140,000–160,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Self-contained pension rooms near Gyeongcheondae and the Sangju Bicycle Museum, 2.8 km from the booth; pricey for one person.' },
+  { town: 'Sangju', name: 'R-MOTEL', en: 'R Motel', lat: 36.35622, lng: 128.30446, price: '₩50,000–60,000', seen: 'Oct 2026', src: 'Yanolja', bikes: true, note: 'Just below Nakdan Weir, roughly 17 km down the path from Sangju Weir; bikes go in a private shuttered garage linked to the room, and the owners help with laundry.' },
+  { town: 'Sangju', name: '휴모텔', en: 'Hyu Motel', lat: 36.35613, lng: 128.3048, price: '₩50,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Next door to R Motel by Nakdan Weir; reviewers recommend it to bike travellers.' },
+  { town: 'Gumi', name: '낙동강 강변하우스', en: 'Riverside House', lat: 36.19412, lng: 128.36221, price: '₩40,000–55,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Riverside pension about 5 km past Gumi Weir; Korea by Bike lists it, and a rider blog notes bike storage and dinner on request.' },
+  { town: 'Gumi', name: '더존모텔', en: 'The Zone Motel', lat: 36.10978, lng: 128.40461, price: '₩40,000–60,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Beside the bike path at Gumi Bridge (15 km past Gumi Weir); advertises a separate bike storage area and a pump, and welcomes cross-country riders.' },
+  { town: 'Gumi', name: '구미센츄리호텔', en: 'Gumi Century Hotel', lat: 36.10859, lng: 128.40266, price: '₩85,000–110,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Full-service 3-star hotel a block from 더존모텔 near Gumi Bridge on the path; a reviewer notes many cross-country cyclists stay here.' },
+  { town: 'Chilgok · Waegwan', name: 'G모텔', en: 'G Motel', lat: 35.99552, lng: 128.39707, price: '₩40,000–50,000', seen: 'Oct 2026', src: 'Yanolja', bikes: true, note: 'Waegwan town motel 2.2 km from Chilgok Weir; a cyclist review says bikes are kept in the room.' },
+  { town: 'Chilgok · Waegwan', name: '젠퍼스호텔', en: null, lat: 35.99022, lng: 128.38442, price: '₩39,000–48,500', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Opened 2022, 3.2 km from the weir; advertises rider discounts and bike storage, and a cyclist reports free laundry and drying.' },
+  { town: 'Chilgok · Waegwan', name: '센트로 관광호텔', en: 'Centro Tourist Hotel', lat: 35.98861, lng: 128.39983, price: '₩100,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: '3-star tourist hotel by the Waegwan bus terminal, 3 km from the weir; listings say staff speak English.' },
+  { town: 'Daegu Dalseong · Hyeonpung', name: '뉴욕비즈니스호텔', en: 'New York Business Hotel', lat: 35.72868, lng: 128.44437, price: '₩55,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Closest pick to Dalseong Weir (2.5 km); the owner is a cyclist, and a rider reports he topped up tyres and gave ice water at checkout.' },
+  { town: 'Daegu Dalseong · Hyeonpung', name: '홍시모텔', en: 'Hongsi Motel', lat: 35.7001, lng: 128.44046, price: '₩67,000–89,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Hyeonpung town motel 4.5 km from the weir; a repeat cross-country rider says the large lift makes taking the bike to the room easy.' },
+  { town: 'Daegu Dalseong · Hyeonpung', name: '엘레강스', en: 'Elegance', lat: 35.702, lng: 128.43922, price: '₩55,000–66,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Hyeonpung town motel 4.3 km from the weir; twin rooms available.' },
+  { town: 'Daegu Dalseong · Hyeonpung', name: '자자모텔', en: 'Jaja Motel', lat: 35.71657, lng: 128.44541, price: '₩38,000+', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Budget motel 3.3 km from the weir; free washing and drying for guests staying two nights or more.' },
+  { town: 'Namji · Changnyeong', name: '하이츠호텔', en: 'Heights Hotel', lat: 35.39225, lng: 128.47432, price: '₩50,000', seen: 'Oct 2026', src: 'Yanolja', bikes: true, note: 'Namji town, 7 km from the Changnyeong-Haman Weir; has a bike storage room on each floor.' },
+  { town: 'Namji · Changnyeong', name: '러브홀릭', en: 'Loveholic', lat: 35.39223, lng: 128.476, price: '₩50,000–70,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Namji town motel that several cross-country riders review well; mentions bike parking.' },
+  { town: 'Namji · Changnyeong', name: 'M모텔', en: 'M Motel', lat: 35.39219, lng: 128.47566, price: '₩50,000', seen: 'Oct 2026', src: 'Yanolja', bikes: true, note: 'Namji town motel with a ground-floor bike storage room.' },
+  { town: 'Namji · Changnyeong', name: '브라운도트호텔남지', en: 'Browndot Hotel Namji', lat: 35.3919, lng: 128.47491, price: '₩70,000–100,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Newer chain hotel near Namji bus terminal; shared washing machine and an in-room clothes steamer that riders say suit cyclists.' },
+  { town: 'Samnangjin · Mulgeum (Yangsan)', name: '이데아호텔', en: 'Idea Hotel', lat: 35.30861, lng: 128.9871, price: '₩38,000–60,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: true, note: 'Near Mulgeum station, 1.4 km from the booth; sells a cycle room (about ₩45,000) where the bike goes in the room.' },
+  { town: 'Samnangjin · Mulgeum (Yangsan)', name: '투헤븐호텔', en: 'To Heaven Hotel', lat: 35.30877, lng: 128.98745, price: '₩43,000–68,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Mulgeum station area, 1.4 km from the booth; highly rated for cleanliness.' },
+  { town: 'Samnangjin · Mulgeum (Yangsan)', name: '칸호텔', en: 'Kan Hotel', lat: 35.309, lng: 128.98549, price: '₩50,000–65,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'About a 3-minute walk from Mulgeum station, 1.3 km from the booth.' },
+  { town: 'Samnangjin · Mulgeum (Yangsan)', name: '타임호텔', en: 'Time Hotel', lat: 35.30887, lng: 128.98728, price: '₩62,000+', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Hotel 4 minutes on foot from Mulgeum station, 1.4 km from the booth.' },
+  { town: 'Busan · Sasang', name: '맥스호텔', en: 'Sasang Max Motel', lat: 35.16432, lng: 128.98022, price: '₩35,000+', seen: 'Oct 2026', src: 'Yanolja', bikes: true, note: 'Near Busan Seobu (Sasang) Bus Terminal for buses home, about 7 km from the finish; Korea by Bike riders took their bikes up in the lift to the room.' },
+  { town: 'Busan · Sasang', name: '하운드호텔(하단)', en: 'Hound Hotel Hadan', lat: 35.10725, lng: 128.96508, price: '₩50,000–65,000', seen: 'Oct 2026', src: 'Yeogi-eottae', bikes: null, note: 'Hadan, 1.6 km from the estuary barrage finish and 1–2 minutes on foot from Hadan metro station.' },
+  { town: 'Busan · Sasang', name: '브라운도트호텔(하단점)', en: 'Browndot Hotel Hadan', lat: 35.10833, lng: 128.96583, price: '₩43,000–73,000', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Hadan, 1.6 km from the finish near Hadan station; has a self-service laundry and a breakfast option.' },
+  { town: 'Busan · Sasang', name: '레이어스호텔', en: 'Layers Hotel Busan Hadan', lat: 35.10671, lng: 128.96436, price: '₩77,500–105,500', seen: 'Oct 2026', src: 'Yanolja', bikes: null, note: 'Larger business hotel in Hadan, 1.5 km from the finish, with sauna and fitness room; paid Korean breakfast.' }
+];
+const topPick = (o) => TOP_STAYS.find((r) => r.name === o.name && Math.abs(r.lat - o.lat) < 0.002 && Math.abs(r.lng - o.lng) < 0.002);
+// extra: a pick missing from the licence data (e.g. Chungju Station motels) — add it to the map and search
+TOP_STAYS.filter((t) => t.extra).forEach((t) => P.push([t.lat, t.lng, 3, t.name]));
+const bikesTxt = (b) => b === true ? 'Bikes can be kept indoors, riders say.' : b === false ? 'Bikes not allowed in the rooms.' : 'Bike storage not known — ask.';
+// Average restaurant prices by province: Korea Consumer Agency price survey (참가격, price.go.kr), September 2026 (provisional).
+// One serving each; pork belly converted to 200 g; gimbap is one roll. Order matches DISHES.
+const FOOD_MONTH = 'Sep 2026';
+const DISHES = ['Naengmyeon (cold noodles)', 'Bibimbap', 'Kimchi stew set meal', 'Pork belly BBQ, 200 g', 'Jajangmyeon (black-bean noodles)', 'Samgyetang (ginseng chicken soup)', 'Kalguksu (noodle soup)', 'Gimbap, one roll'];
+const REGION_FOOD = {
+  '서울': [12692, 12000, 8846, 21321, 7808, 18269, 10038, 3923], '인천': [11917, 9167, 8667, 17685, 7083, 17000, 9000, 3667],
+  '경기': [10931, 9945, 8841, 18166, 7586, 17690, 9810, 3786], '충북': [9714, 9429, 9714, 15305, 6857, 15714, 8857, 3286],
+  '경북': [10346, 9908, 8923, 17306, 6846, 16077, 8462, 3462], '대구': [11750, 10467, 8583, 18470, 7167, 17167, 7583, 3250],
+  '경남': [10808, 9231, 8808, 20067, 7000, 17231, 8077, 3731], '부산': [12000, 9686, 8429, 18175, 7000, 17429, 8071, 3571]
+};
+const PROV = { '서울특별시': ['서울', 'Seoul'], '인천광역시': ['인천', 'Incheon'], '경기도': ['경기', 'Gyeonggi'], '충청북도': ['충북', 'Chungbuk'],
+  '경상북도': ['경북', 'Gyeongbuk'], '대구광역시': ['대구', 'Daegu'], '경상남도': ['경남', 'Gyeongnam'], '부산광역시': ['부산', 'Busan'] };
+// Which surveyed dishes to quote for each food type (indexes into DISHES).
+const TYPE_DISHES = {
+  'Korean restaurant': [1, 2], 'Korean home-style meals with side dishes': [2, 1], 'Korean soups & stews': [2], 'Restaurant (type not known)': [2, 1],
+  'Korean BBQ (grill meat at the table)': [3], 'Chinese-Korean (black-bean noodles, fried rice)': [4], 'Chicken or duck dishes (stew, grilled, ginseng soup)': [5],
+  'Noodles / noodle soup': [6, 0], 'Quick snacks: gimbap rolls, spicy rice cakes': [7]
+};
+// Other food types: starting prices on restaurant menus in route towns (Yeoju, Chungju, Sangju, Gumi, Waegwan, Miryang,
+// Yangsan, Gimhae) posted on Daangn, Jun–Oct 2026 — [dish, price, as of]. A type can have several lines.
+const FOODPRICE = {
+  'Hot soup with rice': [['Sundae-gukbap (soup with rice)', '₩9,000–11,000', 'Oct 2026']],
+  'River-fish stew (spicy)': [['Loach soup, per person', '₩7,000–10,000', 'Oct 2026'], ['Catfish stew for the table', 'from ₩25,000', 'Oct 2026']],
+  'Grilled eel': [['Freshwater eel, one 250 g serving', '₩27,000–30,000', 'Oct 2026']],
+  'Goat stew': [['Goat stew with rice', '₩12,000–15,000', 'Oct 2026']],
+  'Raw fish (sashimi) & seafood': [['Raw fish plate for one', 'about ₩35,000', 'Jun 2026'], ['Small platter for two', 'about ₩40,000', 'Jun 2026']],
+  'Seafood': [['Spicy octopus stir-fry, one serving', '₩11,000–12,000', 'Oct 2026']],
+  'Tofu dishes': [['Soft tofu stew', '₩7,000–9,900', 'Oct 2026']],
+  'Pork cutlet (not spicy)': [['Pork cutlet', '₩8,500–11,500', 'Oct 2026']],
+  'Japanese food': [['Ramen or rice bowl', '₩9,000–10,000', 'Sep 2026'], ['Sushi set', 'about ₩15,000', 'Sep 2026']],
+  'Dumplings': [['A plate of dumplings', '₩6,000–10,000', 'Oct 2026']],
+  'Rice porridge (gentle on the stomach)': [['Porridge', '₩10,000–12,000', 'Jul 2026']],
+  'Korean fried chicken': [['Whole fried chicken', '₩10,000–17,000', 'Oct 2026']],
+  'Chicken or duck dishes (stew, grilled, ginseng soup)': [['Dak-galbi (spicy chicken), per person', '₩12,000–14,000', 'Oct 2026'], ['Whole duck soup for the table', 'about ₩65,000', 'Oct 2026']],
+  'Pizza': [['One pizza', '₩18,000–20,000', 'Oct 2026']],
+  'Western food': [['Pasta', '₩14,000–16,000', 'Oct 2026']],
+  'Asian (Vietnamese / Thai / Indian)': [['Beef pho', '₩6,800–11,500', 'Sep 2026']],
+  'Pub (drinks + bar food)': [['Bar-food plate', '₩10,900–13,900', 'Oct 2026'], ['Draft beer', 'from ₩4,300', 'Oct 2026']],
+  'Bakery': [['Bread or pastry', '₩4,500–5,300', 'Sep 2026']],
+  'Desserts & sweet snacks': [['Bingsu (shaved ice)', '₩12,000–15,000', 'Aug 2026']],
+  'Fish cakes (Busan snack)': [['Fish-cake skewer in broth', 'about ₩1,000', 'Sep 2026']],
+  'Café': [['Americano', 'about ₩3,500', 'Aug 2026']]
+};
+// Chains (keyed by the English name from food.js): [item, price, as of] from the chain's menu or news of its latest price change.
+const CHAINPRICE = {
+  'Mega Coffee': ['Americano', '₩1,700', 'Dec 2025'], 'Compose Coffee': ['Americano', '₩1,500', 'Dec 2025'], "Paik's Coffee": ['Americano', '₩1,700', 'Dec 2025'],
+  'Starbucks': ['Americano (tall)', '₩4,700', 'Dec 2025'], 'Ediya Coffee': ['Americano', '₩3,200', 'Dec 2025'], 'A Twosome Place (café)': ['Americano', '₩4,700', 'Dec 2025'],
+  "McDonald's": ['Big Mac meal', '₩7,600', 'Feb 2026'], 'Lotteria (burgers)': ['Bulgogi burger meal', '₩7,300', 'Apr 2025'],
+  "Mom's Touch (chicken burgers)": ['Chicken thigh burger (burger only)', '₩5,200', 'Mar 2026'], 'Burger King': ['Whopper meal', '₩9,600', 'Feb 2026'],
+  'Subway': ['Egg mayo sandwich, 15 cm', '₩6,200', 'May 2026'],
+  'Kyochon Chicken': ['Whole fried chicken', '₩21,000', 'Oct 2026'], 'BBQ Chicken': ['Whole fried chicken', '₩23,000', 'Oct 2026'],
+  'bhc Chicken': ['Whole chicken (Ppuringkle)', '₩21,000', 'Oct 2026'], 'Goobne Chicken': ['Whole oven-baked chicken', '₩17,900', 'Apr 2024'],
+  'NeNe Chicken': ['Whole fried chicken', '₩20,000', 'Oct 2026'], "Domino's Pizza": ['Large pepperoni pizza', '₩27,400', 'Oct 2026'],
+  'Hong Kong Banjeom (Chinese-Korean)': ['Jajangmyeon (black-bean noodles)', '₩7,000', 'Jun 2026'], 'Bonjuk (rice porridge)': ['Vegetable porridge', '₩10,000', 'Sep 2025'],
+  'Paris Baguette (bakery)': ['Castella cake', '₩2,500', 'Aug 2026'], 'Sulbing (shaved-ice desserts)': ['Injeolmi bingsu', '₩9,900', 'Apr 2025']
+};
+const won = (v) => '₩' + (Math.round(v / 100) * 100).toLocaleString('en-US');
+function foodPrice(o, dsc) {
+  if (!dsc || ![0, 1].includes(o.cat)) return null;
+  const ch = dsc.chain && CHAINPRICE[dsc.en];
+  if (ch) return { short: ch[1], lines: [`${ch[0]}: ${ch[1]}`], src: `${dsc.en.split(' (')[0]} menu price, ${ch[2]}` };
+  const ix = TYPE_DISHES[dsc.type], pv = PROV[areaOf(o.lat, o.lng)[0]], fp = FOODPRICE[dsc.type] || [];
+  const menu = fp.map((f) => `${f[0]}: ${f[1]}`), menuSrc = fp.length ? `menus in towns on the route, ${fp[0][2]}` : '';
+  if (ix && pv && REGION_FOOD[pv[0]]) {
+    const r = REGION_FOOD[pv[0]];
+    return { short: '~' + won(r[ix[0]]), lines: ix.map((i) => `${DISHES[i]}: about ${won(r[i])} ($${Math.round(r[i] / 1400)})`).concat(menu),
+      src: `Average in ${pv[1]} — government price survey, ${FOOD_MONTH}${menuSrc ? '; others from ' + menuSrc : ''}` };
+  }
+  return fp.length ? { short: '~' + fp[0][1].replace(/^(about|from) /, '').split('–')[0], lines: menu, src: 'Starting prices on ' + menuSrc } : null;
+}
 
-async function fillPhotos(el, en, type) {
+const PP = window.PLACE_PHOTOS || {};
+const photoKey = (o) => o.photoKey || (o.cat === 3 && PP['stay:' + o.name] ? 'stay:' + o.name : null);
+async function fillPhotos(el, en, type, head) {
   if (!window.OFFLINE || !el) return;
   el.innerHTML = '<div class="rc-sub">Loading photos…</div>';
   const ph = await window.OFFLINE.photos(en, type);
   if (!ph.length) { el.innerHTML = type ? '' : `<div class="rc-sub">${navigator.onLine ? 'No photos found for this place.' : 'Photos not downloaded yet — Help → Download now (on wifi).'}</div>`; return; }
-  el.innerHTML = `${type ? `<div class="typical">What ${esc(type.split(' (')[0].toLowerCase())} usually looks like — not this exact place</div>` : ''}<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
+  el.innerHTML = `${head ? `<div class="typical">${esc(head)}</div>` : ''}<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
   el.querySelectorAll('img').forEach((im) => im.onclick = () => { $('show-ko').innerHTML = `<img class="bigimg" src="${im.src}">`; $('show-en').textContent = ph[+im.dataset.i].credit + ' · Wikimedia Commons'; $('show').classList.remove('hidden'); });
 }
 
@@ -194,47 +327,72 @@ function placeSheet(o) {
   const catKey = o.cat === -1 ? null : (o.lmEn && PHOTO[o.lmEn] ? 8 : o.cat);
   const icon = o.cat === -1 ? `<div class="num">${o.stop ? o.stop.n : ''}</div>` : `<div class="ic bg${catKey}">${ico(CAT[catKey] ? CAT[catKey].i : 'pin')}</div>`;
   const tip = o.lmEn && PHOTO[o.lmEn];
-  const rp = o.cat === 3 ? riderPick(o) : null;
-  const fp = dsc && FOODPRICE[dsc.type];
+  const rp = o.cat === 3 ? riderPick(o) : null, tp = o.cat === 3 ? topPick(o) : null;
+  const fp = foodPrice(o, dsc);
   let meta = '';
   if (h) { const d = hav(h.lat, h.lng, o.lat, o.lng), b = bearing(h.lat, h.lng, o.lat, o.lng); meta += `<div><b>${fmtD(d)}</b><span>${DIRS[card8(b)]} of you</span></div>`; }
   meta += `<div><b>km ${Math.round(km)}</b><span>on the route</span></div><div><b>${off > 0.15 ? fmtD(off) : 'On path'}</b><span>${off > 0.15 ? 'off the bike path' : 'right beside it'}</span></div>`;
   sheet(`<div class="sh-head">${icon}<div><div class="over">${o.cat === -1 ? 'Stamp booth' : (CAT[catKey] ? CAT[catKey].n : '')}</div><h3>${esc(o.name)}</h3></div></div>
-    ${biz && dsc.en !== o.name ? `<div class="sh-en">${esc(dsc.en)}</div>` : ''}
+    ${biz && ((tp && tp.en) || dsc.en) !== o.name ? `<div class="sh-en">${esc((tp && tp.en) || dsc.en)}</div>` : ''}
     ${o.ko && o.ko !== o.name ? `<div class="sh-ko">${esc(o.ko)}</div>` : ''}
-    ${fp ? `<div class="rc-sub" style="margin:2px 0 6px">Typical price: ${esc(fp)}</div>` : ''}
     ${dsc && dsc.type ? `<div class="sh-type">${ico(CAT[o.cat].i)} ${esc(dsc.type)}</div>${dsc.chain ? '' : '<div class="rc-sub" style="margin:-4px 0 6px">Type guessed from the name</div>'}` : ''}
+    ${fp ? `<div class="area-price"><b>Typical price</b>${fp.lines.map((l) => `<div>${esc(l)}</div>`).join('')}<small>${esc(fp.src)}. A guide, not this place's menu — the Naver Map button below shows the real menu.</small></div>` : ''}
     <div class="sh-meta">${meta}</div>
-    ${o.lmEn || (dsc && dsc.type && window.OFFLINE && window.OFFLINE.hasType(dsc.type)) ? '<div id="sheetphotos" class="photos"></div>' : ''}
+    ${o.lmEn || photoKey(o) ? '<div id="sheetphotos" class="photos"></div>' : ''}
     ${tip ? `<div class="tip">${ico('camera')}<div><b>Photo tip</b> — ${esc(tip)}</div></div>` : ''}
     ${o.desc ? `<p class="desc">${esc(o.desc)}</p>` : ''}
     ${o.phone ? `<a class="btn" href="tel:${esc(o.phone.replace(/[^0-9+]/g, ''))}">${ico('phone')} Call ${esc(o.phone)}</a>` : ''}
-    ${o.cat === 3 ? (rp ? `<div class="price pick">${ico('star')}<div><b>Rider pick · reported price</b><span>${esc(rp.price)} per night</span><small>${esc(rp.note)} Reported by riders in 2023 (Korea by Bike) — may have changed.</small></div></div>` : `<div class="price">${ico('bed')}<div><b>Typical price</b><span>${esc(priceFor(dsc.type))}</span><small>A rough guide, not this place's price. Most motels take walk-ins; cash or card.</small></div></div>`) + `
+    ${o.cat === 3 ? (tp ? `<div class="price pick">${ico('star')}<div><b>Top pick in ${esc(tp.town)}</b><span>${esc(tp.price)} per night</span><small>${tp.note ? esc(tp.note) + ' ' : ''}${bikesTxt(tp.bikes)} Price seen on ${esc(tp.src)}, ${esc(tp.seen)}${rp ? `; riders reported ${esc(rp.price)} in 2023` : ''}. For today's price, tap "Tonight's prices here" below.</small></div></div>` : rp ? `<div class="price pick">${ico('star')}<div><b>Rider pick · reported price</b><span>${esc(rp.price)} per night</span><small>${esc(rp.note)} Reported by riders in 2023 (Korea by Bike) — may have changed.</small></div></div>` : `<div class="price">${ico('bed')}<div><b>Typical price</b><span>${esc(priceFor(dsc.type))}</span><small>A rough guide, not this place's price. Most motels take walk-ins; cash or card.</small></div></div>`) + `
       ${(() => { const tb = townBedsNear(o.lat, o.lng); return tb ? `<div class="area-price"><b>Prices in ${esc(tb.town)}</b> ${esc(tb.txt)}<small>Seen on booking sites 2024–26. Walk-in prices are usually similar; weekends and summer cost more.</small></div>` : ''; })()}
-      <button class="btn primary" data-act="tonight">${ico('bed')} Save as tonight's stay</button>
+      <a class="btn primary" href="${gmaps(o.name, o.lat, o.lng)}">${ico('camera')} Photos &amp; tonight's price (Google Maps)</a>
+      <div class="grid2"><button class="btn" data-act="checkin">${ico('speech')} How to check in</button><button class="btn" data-act="tonight">${ico('bed')} Save as tonight's stay</button></div>
       <div class="grid2"><button class="btn" data-act="bikein">${ico('speech')} Room + bike inside?</button><button class="btn" data-act="price">${ico('speech')} Ask the price</button></div>` : ''}
     <button class="btn ${o.cat === 3 ? '' : 'primary'}" data-act="guide">${ico('nav')} Guide me there</button>
     <div class="grid2"><button class="btn" data-act="maphere">${ico('map')} Show on map</button>
     <button class="btn" data-act="showko">${ico('speech')} Ask the way</button></div>
-    ${biz ? `<div class="online"><div class="card-title">Photos, menu &amp; reviews · needs internet</div>
+    ${biz ? `<div class="online"><div class="card-title">${o.cat === 3 ? 'More hotels, photos' : 'Photos, menu'} &amp; reviews · needs internet</div>
+      ${o.cat === 3 ? `<a class="btn" href="${ghotels(o.lat, o.lng)}">${ico('bed')} Other hotels nearby<small>Google Maps · with tonight's prices</small></a>` : ''}
       <div class="grid2"><a class="btn" href="${gmaps(o.name, o.lat, o.lng)}">Google Maps<small>reviews in English</small></a>
-      <a class="btn" href="${nmaps(o.name, o.lat, o.lng)}">Naver Map<small>most Korean reviews</small></a></div></div>` : ''}
+      <a class="btn" href="${nmaps(o.name, o.lat, o.lng)}">Naver Map<small>${[0, 1].includes(o.cat) ? 'real menu &amp; prices' : 'most Korean reviews'}</small></a></div></div>` : ''}
     <a class="btn ghost" href="${omRoute(o.lat, o.lng, o.ko || o.name)}">${ico('route')} Street directions in Organic Maps</a>`);
   const sb = $('sheet-body');
   sb.querySelector('[data-act=maphere]').onclick = () => { closeSheet(); show('ride'); setSheet('peek'); MapV.goto(o.lat, o.lng, 15.5); };
   sb.querySelector('[data-act=showko]').onclick = () => showCard(`${o.ko || o.name}\n여기에 가고 싶어요.\n어느 쪽이에요?`, `"${dsc ? dsc.en : o.name}" — I want to go here. Which way is it?`);
   const tn = sb.querySelector('[data-act=tonight]'); if (tn) tn.onclick = () => { store.set('tonight', { name: o.name, en: dsc.en, lat: o.lat, lng: o.lng, phone: o.phone || '' }); $('c-hotel').value = o.name; store.set('c_hotel', o.name); tn.innerHTML = ico('check') + ' Saved as tonight\'s stay'; renderTonight(); MapV.redrawSoon(); };
-  const pr = sb.querySelector('[data-act=price]'); if (pr) pr.onclick = () => showCard('하룻밤에 얼마예요?\n한 명이에요.', '"How much for one night? Just one person."');
+  const pr = sb.querySelector('[data-act=price]'); if (pr) pr.onclick = () => showCard('숙박 하룻밤에 얼마예요?\n한 명이에요.', '"How much to stay overnight? Just one person."');
   sb.querySelector('[data-act=guide]').onclick = () => { S.target = { name: dsc && dsc.en !== o.name ? `${o.name} (${dsc.en})` : o.name, lat: o.lat, lng: o.lng }; closeSheet(); show('ride'); setSheet('peek'); MapV.follow(); update(); };
+  const ci = sb.querySelector('[data-act=checkin]'); if (ci) ci.onclick = () => checkinSheet(o);
   const bi = sb.querySelector('[data-act=bikein]'); if (bi) bi.onclick = () => showCard('오늘 밤 1명 묵을 방 있어요?\n자전거를 방이나 안에 둘 수 있어요?', '"Do you have a room for one tonight? Can I keep my bike in the room or inside?"');
   if (o.lmEn) fillPhotos($('sheetphotos'), o.lmEn);
-  else if ($('sheetphotos')) fillPhotos($('sheetphotos'), null, dsc.type);
+  else if ($('sheetphotos')) fillPhotos($('sheetphotos'), photoKey(o), null, o.cat === -1 ? 'Real photos taken near this stop' : 'Real photos taken within 150 m of this place');
+}
+// Walk-in check-in at a Korean motel, step by step: [title, what to know, phrase to show at the desk or null].
+const CHECKIN = [
+  ['Walk in and find the desk', 'Most motels have a small window or desk inside the door. You don\'t need a booking.', ['오늘 밤 숙박이요. 한 명이에요.', '"Overnight tonight, please. One person."']],
+  ['Say "sukbak" (overnight)', '숙박 (sukbak) means staying the night. 대실 (daesil) means renting the room for a few hours in the daytime, which is much cheaper. If the price sounds very low, it may be the daesil price.', ['대실 말고 숙박이요. 하룻밤에 얼마예요?', '"Not daesil — overnight. How much for one night?"']],
+  ['Check the price', 'There is usually a price board by the desk. Fridays, Saturdays and holidays cost more.', null],
+  ['Ask about the bike before you pay', 'Many motels let you keep it in the room or the lobby.', ['자전거를 방이나 안에 둘 수 있어요?', '"Can I keep my bike in the room or inside?"']],
+  ['Arrived early? Ask when you can go in', 'Overnight guests often can\'t have the room until 6 pm or later, and later at weekends. Some let you in early for a little extra.', ['지금 들어갈 수 있어요? 몇 시부터 돼요?', '"Can I go in now? From what time?"']],
+  ['Pay and get the key', 'Cards are usually fine. Remember your room number. The Wi-Fi password is often on a card in the room.', ['카드 돼요?', '"Can I pay by card?"']],
+  ['Checkout', 'Usually between 11 am and 1 pm. Ask to be sure.', ['체크아웃은 몇 시예요?', '"What time is checkout?"']],
+  ['Nobody at the desk?', 'Some motels (무인텔, "unmanned") use a kiosk in Korean only. Call the phone number on the kiosk or sign, or try another motel with a person at the desk.', null]
+];
+function checkinSheet(o) {
+  const tp = topPick(o), rp = riderPick(o), tb = townBedsNear(o.lat, o.lng);
+  const price = tp ? `${tp.price} per night here (seen on ${tp.src}, ${tp.seen}).` : rp ? `${rp.price} per night here (riders, 2023).` : tb ? `In ${tb.town}: ${tb.txt}` : priceFor(descOf(o).type);
+  sheet(`<div class="sh-head"><div class="ic bg3">${ico('bed')}</div><div><div class="over">How to check in</div><h3>${esc(o.name)}</h3></div></div>
+    <div class="area-price"><b>Expect to pay</b>${esc(price)}</div>
+    <ol class="steps">${CHECKIN.map(([t, d, p], i) => `<li><b>${esc(t)}</b><span>${esc(d)}</span>${p ? `<button class="btn" data-p="${i}">${ico('speech')} Show: ${esc(p[1])}</button>` : ''}</li>`).join('')}</ol>
+    <button class="btn" data-act="back">Back to ${esc(o.name)}</button>`);
+  const sb = $('sheet-body');
+  sb.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => { const p = CHECKIN[+b.dataset.p][2]; showCard(p[0], p[1]); });
+  sb.querySelector('[data-act=back]').onclick = () => placeSheet(o);
 }
 function stopSheet(c) {
   const nk = C[c.n] ? C[c.n].km : 99999;
   const lms = LM.filter((l) => l.km >= c.km && l.km < nk);
   const near = c.near || {};
-  placeSheet({ name: c.en, ko: c.ko + ' 인증센터', cat: -1, stop: c, lat: c.lat, lng: c.lng, km: c.km, phone: c.phone,
+  placeSheet({ name: c.en, ko: c.ko + ' 인증센터', cat: -1, stop: c, lat: c.lat, lng: c.lng, km: c.km, phone: c.phone, photoKey: PP['stop:' + c.n] && PP['stop:' + c.n].length ? 'stop:' + c.n : null,
     desc: `${c.staffed ? 'Staffed booth — buy or certify your bike passport here.' + (c.hours ? ' Hours: ' + c.hours + '.' : '') : 'Self-service red stamp booth.'} Within 2 km: ${near[0] || 0} restaurants, ${near[2] || 0} convenience stores, ${near[3] || 0} places to stay.${lms.length ? ' Coming up: ' + lms.map((l) => l.en).join(', ') + '.' : ''}` });
 }
 const lmSheet = (l) => placeSheet({ name: l.en, ko: l.ko, cat: 6, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, lmEn: l.en });
@@ -357,6 +515,24 @@ $('btn-showlocal').onclick = () => {
   const ns = S.info?.nextStop;
   showCard(`저는 자전거로 ${S.toBusan ? '부산' : '서울'}까지 가는 여행자예요.\n국토종주 자전거길로 ${ns ? ns.ko + '까지 ' : ''}가려면 어느 쪽으로 가야 해요?`, `"I'm a traveler riding my bike to ${S.toBusan ? 'Busan' : 'Seoul'}. Which way is the cross-country bike path${ns ? ' to ' + ns.en : ''}?"`);
 };
+// Text the son where Dad is: km on the route, next stop, tonight's stay and a map link. SMS needs only phone signal.
+function locationText() {
+  const h = here(), I = S.info; if (!h) return null;
+  const parts = [`Dad's location${S.sim ? ' (practice mode)' : ''}:`];
+  if (I && !I.far) parts.push(`km ${Math.round(I.km)} of ${TOTAL} on the bike route${I.onPath ? ', on the path' : ''}.`);
+  if (I && I.nextStop) parts.push(`Next stop: ${I.nextStop.en}.`);
+  const t = store.get('tonight', null); if (t) parts.push(`Tonight's stay: ${t.en || t.name}.`);
+  parts.push(`Map: https://maps.google.com/?q=${h.lat.toFixed(5)},${h.lng.toFixed(5)}`);
+  return parts.join(' ');
+}
+function textSon() {
+  const ph = $('c-phone').value.replace(/[^0-9+]/g, ''), msg = locationText();
+  if (!ph) { showCard('(번호를 먼저 입력하세요)', 'Add your son\'s phone number in Help → My contacts first.'); return; }
+  if (!msg) { showCard('', 'Waiting for GPS — try again in a moment, outside if you can.'); return; }
+  location.href = `sms:${ph}&body=${encodeURIComponent(msg)}`;
+}
+$('btn-textson').onclick = textSon;
+$('btn-textson2').onclick = textSon;
 $('btn-om').onclick = () => { const h = here(); location.href = h ? omMap(h.lat, h.lng, 'Me') : 'om://map?v=1'; };
 $('btn-wake').onclick = async () => {
   try {
@@ -407,9 +583,11 @@ function itemRow(o, h, myKm, i) {
   else { iconCls = 'bg' + o.cat; iconName = CAT[o.cat].i; }
   let pickTag = '';
   if ([0, 1, 2, 3, 4, 5].includes(o.cat)) {
-    const ds = descOf(o), rp = o.cat === 3 ? riderPick(o) : null;
-    if (rp) pickTag = `<em class="pick-tag">${ico('star')} Rider pick · ${esc(rp.price)}</em>`;
-    line2 = [ds.en !== o.name ? ds.en : '', ds.type || '', o.cat === 3 && !rp && PRICE[ds.type] ? 'typically ' + PRICE[ds.type].split(' (')[0].split(' ·')[0].replace('Usually ', '') : '', o.cat === 3 && o.phone ? 'has phone' : ''].filter(Boolean).join(' · ');
+    const ds = descOf(o), rp = o.cat === 3 ? riderPick(o) : null, tp = o.cat === 3 ? topPick(o) : null;
+    if (tp) pickTag = `<em class="pick-tag">${ico('star')} Top pick · ${esc(tp.price)}</em>`;
+    else if (rp) pickTag = `<em class="pick-tag">${ico('star')} Rider pick · ${esc(rp.price)}</em>`;
+    const en = (tp && tp.en) || ds.en;
+    line2 = [en !== o.name ? en : '', ds.type || '', o.cat === 3 && !rp && !tp && PRICE[ds.type] ? 'typically ' + PRICE[ds.type].split(' (')[0].split(' ·')[0].replace('Usually ', '') : '', (foodPrice(o, ds) || {}).short, o.cat === 3 && o.phone ? 'has phone' : ''].filter(Boolean).join(' · ');
   }
   else if (o.sub) line2 = o.sub;
   return `<div class="place" data-i="${i}"><div class="ic ${iconCls}">${ico(iconName)}</div>
@@ -422,7 +600,7 @@ function openItem(o) { if (o.stop) stopSheet(o.stop); else if (o.lmEn) lmSheet(L
 let SEARCH_IDX = null;
 function buildSearch() {
   if (SEARCH_IDX) return SEARCH_IDX;
-  SEARCH_IDX = P.map((p) => { const d = window.FOOD.describe(p[3], p[2]); const rp = p[2] === 3 && riderPick({ name: p[3], lat: p[0], lng: p[1] }); return (p[3] + ' ' + d.en + ' ' + (d.type || '') + ' ' + CAT[p[2]].n + ' ' + CAT[p[2]].ko + (rp ? ' rider pick recommended ' + rp.price : '')).toLowerCase(); });
+  SEARCH_IDX = P.map((p) => { const d = window.FOOD.describe(p[3], p[2]); const o = { name: p[3], lat: p[0], lng: p[1] }, rp = p[2] === 3 && riderPick(o), tp = p[2] === 3 && topPick(o); return (p[3] + ' ' + d.en + ' ' + (d.type || '') + ' ' + CAT[p[2]].n + ' ' + CAT[p[2]].ko + (rp ? ' rider pick recommended ' + rp.price : '') + (tp ? ' top pick recommended best ' + tp.price + ' ' + tp.town : '')).toLowerCase(); });
   return SEARCH_IDX;
 }
 const SYN = { hotel: 'place to stay', motel: 'motel', bed: 'place to stay', room: 'place to stay', hostel: 'guesthouse', sleep: 'place to stay', stay: 'place to stay', repair: 'bike shop', bicycle: 'bike shop', mechanic: 'bike shop', tire: 'bike shop', bathroom: 'toilet', restroom: 'toilet', wc: 'toilet', coffee: 'café', cafe: 'café', store: 'convenience', shop: 'convenience', mart: 'convenience', meat: 'bbq', noodles: 'noodle', bread: 'bakery' };
@@ -515,7 +693,8 @@ function renderRoute() {
       <div class="tl-top"><b>${esc(c.en)}</b><span>km ${c.km}</span></div><div class="ko">${esc(c.ko)}</div>
       <div class="tags">${tags.join('')}</div>
       ${lms.length ? `<div class="lms">${lms.map((l) => `<div>${ico(PHOTO[l.en] ? 'camera' : 'star')}${esc(l.en)} · km ${l.km}</div>`).join('')}</div>` : ''}
-      ${(() => { const tb = TOWN_BEDS.find((t) => t.stop === c.n); return tb ? `<div class="beds">${ico('bed')}<div><b>${esc(tb.town)}</b> ${esc(tb.txt)}</div></div>` : ''; })()}</div></div>`;
+      ${(() => { const tb = TOWN_BEDS.find((t) => t.stop === c.n); if (!tb) return ''; const tops = TOP_STAYS.filter((t) => t.town === tb.town);
+        return `<div class="beds">${ico('bed')}<div><b>${esc(tb.town)}</b> ${esc(tb.txt)}${tops.length ? `<div class="tops">${ico('star')} Top picks: ${tops.map((t) => `${esc(t.en || descOf(t).en)} ${esc(t.price)}`).join(' · ')}</div>` : ''}</div></div>`; })()}</div></div>`;
     CLIMBS.filter(([k]) => k >= c.km && k < nk).forEach(([k, t]) => { html += `<div class="tl note"><div class="rail"><div class="dot">${ico('mountain')}</div></div><div class="tl-body"><b>km ${k}</b> · ${t}</div></div>`; });
   });
   if (myKm != null && !placedMe) html += meRow();
@@ -647,9 +826,9 @@ async function dlStatus() {
   const pct = Math.round((c.tiles / c.totalTiles) * 100);
   $('dlstat').innerHTML = `Terrain ${pct}% · Photos ${c.photoPlaces}/${LM.length} places · Sign reader ${ocr ? 'ready' : 'not yet'}`;
   $('dlbar').style.width = Math.round((pct + c.photoPlaces / LM.length * 100 + (ocr ? 100 : 0)) / 3) + '%';
-  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && c.typePhotos >= c.typeTotal - 4 && ocr;
+  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && c.placePhotos >= c.placeTotal - 5 && ocr;
   $('btn-dl').innerHTML = all ? ico('check') + ' Everything downloaded' : ico('download') + ' Download now';
-  $('dlstat').innerHTML = `<div class="dlrow">${ico(pct >= 98 ? 'check' : 'download')} Terrain map <b>${pct}%</b></div><div class="dlrow">${ico(c.photoPlaces >= LM.length - 3 ? 'check' : 'download')} Landmark photos <b>${c.photoPlaces} of ${LM.length}</b></div><div class="dlrow">${ico(c.typePhotos >= c.typeTotal - 4 ? 'check' : 'download')} Food &amp; stay photos <b>${c.typePhotos} of ${c.typeTotal}</b></div><div class="dlrow">${ico(ocr ? 'check' : 'download')} Sign reader <b>${ocr ? 'ready' : 'not yet'}</b></div>`;
+  $('dlstat').innerHTML = `<div class="dlrow">${ico(pct >= 98 ? 'check' : 'download')} Terrain map <b>${pct}%</b></div><div class="dlrow">${ico(c.photoPlaces >= LM.length - 3 ? 'check' : 'download')} Landmark photos <b>${c.photoPlaces} of ${LM.length}</b></div><div class="dlrow">${ico(c.placePhotos >= c.placeTotal - 5 ? 'check' : 'download')} Stop &amp; hotel photos <b>${c.placePhotos} of ${c.placeTotal}</b></div><div class="dlrow">${ico(ocr ? 'check' : 'download')} Sign reader <b>${ocr ? 'ready' : 'not yet'}</b></div>`;
   S.dlAll = all; offlineBadge();
   return all;
 }

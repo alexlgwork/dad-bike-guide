@@ -12,23 +12,42 @@ Home Screen once on wifi; after that it must work with no signal.
 - `words.js` — Korean sign dictionary, towns with km, stop aliases, phrase cards.
 - `food.js` — Hangul romanization + food/lodging type guessed from the Korean name; chain names.
 - `offline.js` — one-time downloads to Cache Storage: terrain tiles (AWS Terrarium, z7–12 along the route),
-  Wikimedia Commons photos for landmarks and for each food/lodging *type*, Tesseract OCR (Korean) from jsdelivr.
+  Wikimedia Commons photos for landmarks, Tesseract OCR (Korean) from jsdelivr. (`TYPE_Q` type photos are no longer downloaded.)
+- `photos.js` — `PLACE_PHOTOS`: 61 hand-picked, free-licence Wikimedia Commons photos near stamp booths (`stop:N`) and
+  top-pick stays (`stay:<name>`), found by Commons geosearch then curated by hand (junk like cars/space/insects removed).
+  offline.js caches them in Download now; stop and stay sheets show them.
 - `icons.js` — line icon set + canvas map icons. `sw.js` — service worker (bump `CACHE` version on every release).
 
 ## Data sources (keep attribution in Help)
 - Route lines, booths, bike shops, toilets, sights: OpenStreetMap (ODbL) via github.com/HAGUANGHO/korea-bicycle-road-site.
 - Restaurants/cafés/stores/lodging: Korean public data portal (business licence data). Names are Korean only.
-- Hotel prices: `TOWN_BEDS` (booking-site listings 2024–26) and `RIDER_STAYS` (Korea by Bike, rider-submitted 2023) in app.js.
+- Hotel prices: `TOWN_BEDS` (booking-site listings 2024–26), `RIDER_STAYS` (Korea by Bike, rider-submitted 2023) and
+  `TOP_STAYS` (3–4 shortlisted stays per overnight town, prices checked Oct 2026) in app.js. Every stay links to a Google Maps hotel search at its spot for tonight's prices
+  (Google Hotels search by name failed for small motels).
+- Food prices: `REGION_FOOD` = Korea Consumer Agency 참가격 survey (price.go.kr 외식비, 8 dishes × province), Sep 2026.
+  Refresh: POST searchYear/searchMonth to the 외식비 page. Other food types (`FOODPRICE`): starting prices on
+  Daangn menus in route towns, Jun–Oct 2026. Chains (`CHAINPRICE`): chain menus / price-change news, 2024–26.
 
 ## Constraints / decisions
 - Must work fully offline after install; no API keys in the client (public site).
-- Don't copy Google/Yelp/Naver photos or reviews into the app (their terms forbid storing them). Each place links
-  out to Google Maps / Naver Map for live photos & reviews instead. Type photos are labelled "not this exact place".
+- The site and repo are public, so Google/Yelp/Naver photos and reviews must not be published in them (their terms
+  forbid copying them out). The owner does want real place photos on Dad's phone before the trip — see Ideas below.
+  Each place links out to Google Maps / Naver Map for live photos & reviews. Generic "what this type usually looks
+  like" photos were removed from food/stay pages — the owner only wants real photos of the actual place.
+- Real photos of *any* hotel are only available live (Google Maps button "Photos & tonight's price"); there is no
+  storable source for all ~1,000 stays. Offline, every stay has a "How to check in" guide (`CHECKIN` in app.js:
+  숙박 vs 대실, late check-in, bike, checkout) with phrase cards.
+- Tracking Dad: use iPhone Find My → Share My Location (background, needs no app). The PWA can't track in the
+  background; it has a "Text my location to my son" button (sms: link to the Help → Son's phone number).
+- sw.js may only delete its own `bike-korea-*` caches on update; the `bk-*` caches hold Dad's downloaded maps/photos/OCR.
 - Dad reads English; keep Korean text for showing locals and matching signs. UI: clean, map-first, Korean blue, line icons.
 
 ## Ideas not done yet
-- "Save photos to this place" (Dad attaches his own screenshots/camera photos; store in IndexedDB).
-- Verified shortlist of 3–4 stays per overnight town (still open, price, bikes allowed, rating, link).
+- Real photos of hotels and restaurants, loaded on Dad's phone before the trip (he should not have to add anything):
+  1. Korea Tourism Organization TourAPI (data.go.kr 15101578, KOGL type 1/3 images, free key) — fetch at build time,
+     never put the key in the client.
+  2. For places TourAPI misses: a private photo pack the owner fills by hand from Google Maps/Naver, kept off the
+     public site (e.g. encrypted pack + code typed once on Dad's phone).
 
 ## Test locally
 `python3 -m http.server 8765` in this folder, open http://localhost:8765 with a phone-sized window.

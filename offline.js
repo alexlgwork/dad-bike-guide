@@ -51,6 +51,9 @@ const TYPE_Q = {
   'Homestay / B&B': ['민박', 'Minbak Korea'], 'Guesthouse': ['게스트하우스', 'Guesthouse Korea'], 'Sauna / jjimjilbang (cheap overnight)': ['찜질방', 'Jjimjilbang'],
   'Campground': ['야영장', 'Campground South Korea'], 'Old-style inn (cheap)': ['여관', 'Yeogwan Korea'], 'Resort': ['리조트', 'Resort South Korea'], 'Place to stay': ['모텔', 'Motel room South Korea']
 };
+// Real geotagged photos near each stamp booth ('stop:N') and top-pick stay ('stay:<name>'), chosen at build time (photos.js).
+const PP = window.PLACE_PHOTOS || {};
+const PP_ALL = Object.values(PP).flat();
 const BAD = /(logo|map|지도|위치|icon|flag|emblem|seal|symbol|locat|문장|signature|coat_of_arms|diagram|plan|도면|svg|기호|약도|route|노선)/i;
 const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 async function j(url) { const r = await fetch(url, { mode: 'cors' }); if (!r.ok) throw new Error(r.status); return r.json(); }
@@ -90,9 +93,10 @@ async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ le
 const Off = {
   status: { terrain: 0, terrainTotal: 0, photos: 0, photosTotal: D.landmarks.length, running: false },
   async counts() {
-    const out = { tiles: 0, totalTiles: tileList().length, photoPlaces: 0, typePhotos: 0, typeTotal: Object.keys(TYPE_Q).length };
+    const out = { tiles: 0, totalTiles: tileList().length, photoPlaces: 0, typePhotos: 0, typeTotal: Object.keys(TYPE_Q).length, placePhotos: 0, placeTotal: PP_ALL.length };
     try {
       const tc = await caches.open(TCACHE); out.tiles = (await tc.keys()).length;
+      const have = new Set((await (await caches.open(PCACHE)).keys()).map((r) => r.url)); out.placePhotos = PP_ALL.filter((p) => have.has(p.src)).length;
       const meta = await Off.meta(); out.photoPlaces = Object.entries(meta).filter(([k, a]) => !k.startsWith('type:') && a.length).length; out.typePhotos = Object.entries(meta).filter(([k, a]) => k.startsWith('type:') && a.length).length; out.typeTotal = Object.keys(TYPE_Q).length;
     } catch (e) {}
     return out;
@@ -101,7 +105,7 @@ const Off = {
   async download(onProgress) {
     if (Off.status.running) return; Off.status.running = true;
     const tiles = tileList(); const tc = await caches.open(TCACHE); const pc = await caches.open(PCACHE);
-    let done = 0, failed = 0; const total = tiles.length + D.landmarks.length + Object.keys(TYPE_Q).length + 1;
+    let done = 0, failed = 0; const total = tiles.length + D.landmarks.length + PP_ALL.length + 1;
     const tick = (msg) => onProgress && onProgress({ done, total, failed, msg });
     await pool(tiles, 6, async (k) => {
       const [z, x, y] = k.split('/').map(Number), url = TILE_URL(z, x, y);
@@ -117,13 +121,9 @@ const Off = {
       } catch (e) { failed++; }
       done++; tick('Photos');
     });
-    await pool(Object.keys(TYPE_Q), 3, async (t) => {
-      try {
-        const key = 'type:' + t; let photos = meta[key];
-        if (!photos || !photos.length) { photos = await findPhotos(t, TYPE_Q[t], 2); meta[key] = photos; }
-        for (const p of photos) { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); } }
-      } catch (e) { failed++; }
-      done++; if (done % 4 === 0) tick('Food & stay photos');
+    await pool(PP_ALL, 4, async (p) => {
+      try { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); else failed++; } } catch (e) { failed++; }
+      done++; if (done % 4 === 0) tick('Stop & hotel photos');
     });
     try { tick('Sign reader'); await Ocr.prepare(); } catch (e) { failed++; }
     await pc.put(META_URL, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
@@ -133,8 +133,8 @@ const Off = {
   // photos for one landmark as object URLs (offline), or live if online and not saved
   async photos(en, type) {
     const key = type ? 'type:' + type : en;
-    const meta = await Off.meta(); let list = meta[key];
-    if ((!list || !list.length) && navigator.onLine && (!type || TYPE_Q[type])) { try { list = type ? await findPhotos(type, TYPE_Q[type], 2) : await findPhotos(en); } catch (e) { list = []; } }
+    const meta = await Off.meta(); let list = meta[key] || PP[key];
+    if ((!list || !list.length) && navigator.onLine && (!type || TYPE_Q[type]) && !/^(stop|stay):/.test(key)) { try { list = type ? await findPhotos(type, TYPE_Q[type], 2) : await findPhotos(en); } catch (e) { list = []; } }
     const pc = await caches.open(PCACHE).catch(() => null); const out = [];
     for (const p of list || []) {
       let src = null;

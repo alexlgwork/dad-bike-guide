@@ -296,7 +296,10 @@ window.PHRASES = [
     ["오늘 밤 묵을 방 있어요? 한 명이에요.", "Do you have a room for tonight? Just one person."],
     ["자전거를 방이나 안에 둘 수 있어요?", "Can I keep my bike in the room or inside?"],
     ["근처에 모텔이나 숙소가 있어요?", "Is there a motel or place to stay nearby?"],
-    ["하룻밤에 얼마예요?", "How much for one night?"]
+    ["하룻밤에 얼마예요?", "How much for one night?"],
+    ["대실 말고 숙박이요.", "Not a few hours (daesil) — overnight, please."],
+    ["지금 들어갈 수 있어요?", "Can I check in now?"],
+    ["체크아웃은 몇 시예요?", "What time is checkout?"]
   ]},
   { group: "Food & shopping", items: [
     ["이거 하나 주세요.", "One of this, please. (point at it)"],
