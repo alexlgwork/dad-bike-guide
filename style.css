@@ -26,6 +26,10 @@ b{font-weight:650}
 .page{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--safe-t) + 14px) 16px 28px}
 .page h1{font-size:32px;font-weight:800;letter-spacing:-.025em;margin:6px 2px 14px}
 
+/* Home Screen mode draws the iPhone clock and battery in white over the page (black-translucent), so keep a dark band behind them */
+#sbar{position:fixed;left:0;right:0;top:0;z-index:40;height:var(--safe-t);background:var(--navy);pointer-events:none}
+#v-ride.active~#sbar{height:calc(var(--safe-t) + 8px);background:linear-gradient(rgba(11,37,69,.85) 60%,rgba(11,37,69,0))}
+
 /* ---------- tab bar ---------- */
 nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;height:calc(var(--tabh) + var(--safe-b));padding-bottom:var(--safe-b);display:grid;grid-template-columns:repeat(5,1fr);background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line)}
 nav#tabs button{border:0;background:none;color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit}
@@ -48,7 +52,7 @@ nav#tabs button.on{color:var(--pri)}
 .netbadge.warn{background:#f59f00;color:#1b1300}
 .dlrow{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:15.5px;color:var(--ink)}
 .dlrow b{margin-left:auto}
-.pill{position:absolute;z-index:4;top:calc(var(--safe-t) + 96px);left:50%;transform:translateX(-50%);border:0;border-radius:22px;padding:11px 18px;background:var(--pri);color:#fff;font:inherit;font-weight:650;box-shadow:var(--shadow)}
+.pill{position:absolute;z-index:4;top:calc(var(--safe-t) + 148px);left:14px;border:0;border-radius:22px;padding:11px 18px;background:var(--pri);color:#fff;font:inherit;font-weight:650;box-shadow:var(--shadow)}
 .fabs{position:absolute;z-index:3;right:12px;top:calc(var(--safe-t) + 100px);display:flex;flex-direction:column;gap:10px}
 .fab{width:48px;height:48px;border-radius:14px;border:0;background:var(--card);color:var(--ink);display:grid;place-items:center;box-shadow:var(--shadow)}
 .fab.primary{color:var(--pri)}
@@ -66,6 +70,8 @@ nav#tabs button.on{color:var(--pri)}
 /* bottom sheet */
 .bsheet{position:absolute;z-index:6;left:0;right:0;bottom:0;height:calc(100% - var(--safe-t) - 18px);background:var(--card);border-radius:22px 22px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);transform:translateY(calc(100% - var(--vis)));transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .bsheet.peek{--vis:204px}.bsheet.half{--vis:56%}.bsheet.full{--vis:100%}
+/* tall iPhones (Air, Pro, Pro Max) have room to show the next stamp booth without dragging */
+@media (min-height:860px){.bsheet.peek{--vis:298px}}
 .bsheet.dragging{transition:none}
 .grab{padding:9px 0 4px;display:flex;justify-content:center;touch-action:none;cursor:grab}
 .grab span{width:40px;height:5px;border-radius:3px;background:var(--line)}
@@ -234,6 +240,7 @@ textarea:focus,input:focus,select:focus{outline:none;border-color:var(--pri);bac
 .typical{font-size:12.5px;font-weight:650;color:var(--mut);padding:0 18px 6px;text-transform:uppercase;letter-spacing:.04em}
 .navbar.guide{background:#5b34c9}
 .guidebar{position:absolute;z-index:4;left:14px;top:calc(var(--safe-t) + 146px);display:flex;align-items:center;gap:10px;background:var(--card);border-radius:18px;padding:6px 6px 6px 14px;box-shadow:var(--shadow);font-size:14px;font-weight:600}
+#btn-startgps:not(.hidden)~.guidebar{top:calc(var(--safe-t) + 204px)}
 .guidebar button{border:0;background:#5b34c9;color:#fff;border-radius:14px;padding:7px 14px;font:inherit;font-weight:700}
 .seg{display:flex;background:var(--btn);border-radius:12px;padding:3px;margin:0 0 8px}
 .seg button{flex:1;border:0;background:none;padding:9px;border-radius:10px;font:inherit;font-size:14.5px;font-weight:650;color:var(--mut)}

@@ -45,6 +45,9 @@ Home Screen once on wifi; after that it must work with no signal.
   background; it has a "Text my location to my son" button (sms: link to the Help → Son's phone number).
 - sw.js may only delete its own `bike-korea-*` caches on update; the `bk-*` caches hold Dad's downloaded maps/photos/OCR.
 - Dad reads English; keep Korean text for showing locals and matching signs. UI: clean, map-first, Korean blue, line icons.
+- Dad's phone is an iPhone Air (420 × 912 pt, 3x). Launch screen `icons/splash-1260x2736.png` (icon on navy). Home Screen
+  mode keeps the clock/battery white over the page (black-translucent), so `#sbar` puts a navy band behind them.
+  Tall screens (≥ 860 px) open the ride sheet at 298 px so the next stamp booth row shows in full.
 
 ## Ideas not done yet
 - Real photos of hotels and restaurants, loaded on Dad's phone before the trip (he should not have to add anything):

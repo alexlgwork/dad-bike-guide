@@ -1024,7 +1024,7 @@ function offlineBadge() {
   else { b.textContent = '✓ Fully offline'; b.className = 'netbadge ok'; }
 }
 $('netbadge').onclick = (e) => { e.stopPropagation(); show('help'); setTimeout(() => $('dlcard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); };
-const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'photos.js', 'offline.js', 'icons.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'photos.js', 'offline.js', 'icons.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/splash-1260x2736.png'];
 async function offlineStatus() {
   const b = $('netbadge');
   try {
