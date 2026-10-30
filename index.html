@@ -26,9 +26,10 @@
       <div id="st-line" class="nav-main">Finding your location</div>
       <div id="st-sub" class="nav-sub">GPS works without a phone signal</div>
     </div>
-    <span id="netbadge" class="netbadge"></span>
   </div>
+  <button id="netbadge" class="netbadge"></button>
   <button id="btn-startgps" class="pill hidden">Turn on location</button>
+  <div id="guidebar" class="guidebar hidden"><span>Guiding you to a place</span><button id="guide-stop">End</button></div>
 
   <div class="fabs">
     <button id="m-layers" class="fab" aria-label="Map layers"><i data-i="layers"></i></button>
@@ -129,6 +130,7 @@
     <button data-cat="1" class="chip"><i data-i="coffee"></i>Cafés</button>
     <button data-cat="9" class="chip"><i data-i="hospital"></i>Hospital</button>
   </div>
+  <div id="staymode" class="seg hidden"><button data-m="ahead" class="on">Ahead on my route</button><button data-m="near">Closest to me</button></div>
   <div id="nearhead" class="fine"></div>
   <div id="nearlist" class="list"></div>
 </section>
@@ -193,7 +195,7 @@
   </div>
   <div class="card" id="dlcard">
     <div class="card-title">Offline downloads</div>
-    <p class="rc-sub">Terrain, landmark photos and the sign reader. Do this once on wifi (≈ 40 MB).</p>
+    <p class="rc-sub">Terrain map, landmark photos, food &amp; hotel photos and the sign reader. Do this once on wifi (about 50 MB, a few minutes). When every line shows a check mark, the badge on the map says <b>Fully offline</b>.</p>
     <div id="dlstat" class="rc-sub"></div>
     <div class="progress"><div id="dlbar"></div></div>
     <button class="btn primary" id="btn-dl"><i data-i="download"></i> Download now</button>

@@ -109,6 +109,7 @@ function showCard(ko, en) { $('show-ko').textContent = ko; $('show-en').textCont
 $('show-x').onclick = () => $('show').classList.add('hidden');
 
 const omMap = (lat, lng, name) => `om://map?v=1&ll=${lat.toFixed(6)},${lng.toFixed(6)}&n=${encodeURIComponent(name || 'Here')}`;
+const omRoute = (lat, lng, name) => { const h = here(); return h ? `om://route?v=1&sll=${h.lat.toFixed(6)},${h.lng.toFixed(6)}&saddr=Me&dll=${lat.toFixed(6)},${lng.toFixed(6)}&daddr=${encodeURIComponent(name)}&type=bicycle` : omMap(lat, lng, name); };
 const omSearch = (q) => { const h = here(); const ll = h ? `cll=${h.lat.toFixed(5)},${h.lng.toFixed(5)}&` : ''; return `om://search?${ll}query=${encodeURIComponent(q)}&locale=en`; };
 const gmaps = (name, lat, lng) => `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat.toFixed(5)},${lng.toFixed(5)},17z`;
 const nmaps = (name, lat, lng) => `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${lng.toFixed(5)},${lat.toFixed(5)},16,0,0,0,dh`;
@@ -135,13 +136,20 @@ const PHOTO = {
   'Nakdong Estuary Barrage (FINISH)': 'Finish-line photo with your stamped passport. Sunset over the estuary.'
 };
 const isPhotoSpot = (l) => !!PHOTO[l.en];
+// Typical prices (2026 guides) — a rough idea only, always ask at the desk.
+const PRICE = {
+  'Motel': '₩40,000–70,000 per room (about $30–50)', 'Hotel': '₩80,000–140,000 per room (about $60–100)',
+  'Guesthouse': 'Dorm bed ₩15,000–25,000 · private room ₩35,000–60,000', 'Sauna / jjimjilbang (cheap overnight)': '₩10,000–20,000 per person, sleep on a heated floor',
+  'Old-style inn (cheap)': 'Usually ₩30,000–50,000 (older, simpler rooms)', 'Homestay / B&B': 'Usually ₩30,000–60,000', 'Place to stay': 'Motels are usually ₩40,000–70,000 per room'
+};
+const priceFor = (type) => PRICE[type] || 'Prices vary — ask at the desk';
 
-async function fillPhotos(el, en) {
+async function fillPhotos(el, en, type) {
   if (!window.OFFLINE || !el) return;
   el.innerHTML = '<div class="rc-sub">Loading photos…</div>';
-  const ph = await window.OFFLINE.photos(en);
-  if (!ph.length) { el.innerHTML = `<div class="rc-sub">${navigator.onLine ? 'No photos found for this place.' : 'Photos not downloaded yet — Help → Download now (on wifi).'}</div>`; return; }
-  el.innerHTML = `<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
+  const ph = await window.OFFLINE.photos(en, type);
+  if (!ph.length) { el.innerHTML = type ? '' : `<div class="rc-sub">${navigator.onLine ? 'No photos found for this place.' : 'Photos not downloaded yet — Help → Download now (on wifi).'}</div>`; return; }
+  el.innerHTML = `${type ? `<div class="typical">What ${esc(type.split(' (')[0].toLowerCase())} usually looks like — not this exact place</div>` : ''}<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
   el.querySelectorAll('img').forEach((im) => im.onclick = () => { $('show-ko').innerHTML = `<img class="bigimg" src="${im.src}">`; $('show-en').textContent = ph[+im.dataset.i].credit + ' · Wikimedia Commons'; $('show').classList.remove('hidden'); });
 }
 
@@ -160,25 +168,31 @@ function placeSheet(o) {
   sheet(`<div class="sh-head">${icon}<div><div class="over">${o.cat === -1 ? 'Stamp booth' : (CAT[catKey] ? CAT[catKey].n : '')}</div><h3>${esc(o.name)}</h3></div></div>
     ${biz && dsc.en !== o.name ? `<div class="sh-en">${esc(dsc.en)}</div>` : ''}
     ${o.ko && o.ko !== o.name ? `<div class="sh-ko">${esc(o.ko)}</div>` : ''}
-    ${dsc && dsc.type ? `<div class="sh-type">${ico(CAT[o.cat].i)} ${esc(dsc.type)}</div>${dsc.chain ? '' : '<div class="rc-sub" style="margin:-4px 0 6px">Food type guessed from the name</div>'}` : ''}
+    ${dsc && dsc.type ? `<div class="sh-type">${ico(CAT[o.cat].i)} ${esc(dsc.type)}</div>${dsc.chain ? '' : '<div class="rc-sub" style="margin:-4px 0 6px">Type guessed from the name</div>'}` : ''}
     <div class="sh-meta">${meta}</div>
-    ${o.lmEn ? '<div id="sheetphotos" class="photos"></div>' : ''}
+    ${o.lmEn || (dsc && dsc.type && window.OFFLINE && window.OFFLINE.hasType(dsc.type)) ? '<div id="sheetphotos" class="photos"></div>' : ''}
     ${tip ? `<div class="tip">${ico('camera')}<div><b>Photo tip</b> — ${esc(tip)}</div></div>` : ''}
     ${o.desc ? `<p class="desc">${esc(o.desc)}</p>` : ''}
     ${o.phone ? `<a class="btn" href="tel:${esc(o.phone.replace(/[^0-9+]/g, ''))}">${ico('phone')} Call ${esc(o.phone)}</a>` : ''}
-    ${o.cat === 3 ? `<button class="btn primary" data-act="tonight">${ico('bed')} Save as tonight's stay</button><button class="btn" data-act="bikein">${ico('speech')} Ask: room for one, bike inside?</button>` : ''}
-    <div class="grid2"><button class="btn ${o.cat === 3 ? '' : 'primary'}" data-act="maphere">${ico('map')} Show on map</button>
+    ${o.cat === 3 ? `<div class="price">${ico('bed')}<div><b>Typical price</b><span>${esc(priceFor(dsc.type))}</span><small>A rough guide, not this place's price. Most motels take walk-ins; cash or card.</small></div></div>
+      <button class="btn primary" data-act="tonight">${ico('bed')} Save as tonight's stay</button>
+      <div class="grid2"><button class="btn" data-act="bikein">${ico('speech')} Room + bike inside?</button><button class="btn" data-act="price">${ico('speech')} Ask the price</button></div>` : ''}
+    <button class="btn ${o.cat === 3 ? '' : 'primary'}" data-act="guide">${ico('nav')} Guide me there</button>
+    <div class="grid2"><button class="btn" data-act="maphere">${ico('map')} Show on map</button>
     <button class="btn" data-act="showko">${ico('speech')} Ask the way</button></div>
     ${biz ? `<div class="online"><div class="card-title">Photos, menu &amp; reviews · needs internet</div>
       <div class="grid2"><a class="btn" href="${gmaps(o.name, o.lat, o.lng)}">Google Maps<small>reviews in English</small></a>
       <a class="btn" href="${nmaps(o.name, o.lat, o.lng)}">Naver Map<small>most Korean reviews</small></a></div></div>` : ''}
-    <a class="btn ghost" href="${omMap(o.lat, o.lng, o.ko || o.name)}">${ico('map')} Open in Organic Maps (street map)</a>`);
+    <a class="btn ghost" href="${omRoute(o.lat, o.lng, o.ko || o.name)}">${ico('route')} Street directions in Organic Maps</a>`);
   const sb = $('sheet-body');
   sb.querySelector('[data-act=maphere]').onclick = () => { closeSheet(); show('ride'); setSheet('peek'); MapV.goto(o.lat, o.lng, 15.5); };
   sb.querySelector('[data-act=showko]').onclick = () => showCard(`${o.ko || o.name}\n여기에 가고 싶어요.\n어느 쪽이에요?`, `"${dsc ? dsc.en : o.name}" — I want to go here. Which way is it?`);
   const tn = sb.querySelector('[data-act=tonight]'); if (tn) tn.onclick = () => { store.set('tonight', { name: o.name, en: dsc.en, lat: o.lat, lng: o.lng, phone: o.phone || '' }); $('c-hotel').value = o.name; store.set('c_hotel', o.name); tn.innerHTML = ico('check') + ' Saved as tonight\'s stay'; renderTonight(); MapV.redrawSoon(); };
+  const pr = sb.querySelector('[data-act=price]'); if (pr) pr.onclick = () => showCard('하룻밤에 얼마예요?\n한 명이에요.', '"How much for one night? Just one person."');
+  sb.querySelector('[data-act=guide]').onclick = () => { S.target = { name: dsc && dsc.en !== o.name ? `${o.name} (${dsc.en})` : o.name, lat: o.lat, lng: o.lng }; closeSheet(); show('ride'); setSheet('peek'); MapV.follow(); update(); };
   const bi = sb.querySelector('[data-act=bikein]'); if (bi) bi.onclick = () => showCard('오늘 밤 1명 묵을 방 있어요?\n자전거를 방이나 안에 둘 수 있어요?', '"Do you have a room for one tonight? Can I keep my bike in the room or inside?"');
   if (o.lmEn) fillPhotos($('sheetphotos'), o.lmEn);
+  else if ($('sheetphotos')) fillPhotos($('sheetphotos'), null, dsc.type);
 }
 function stopSheet(c) {
   const nk = C[c.n] ? C[c.n].km : 99999;
@@ -202,6 +216,7 @@ function startGPS() {
   }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
 }
 $('btn-startgps').onclick = startGPS;
+$('guide-stop').onclick = () => { S.target = null; update(); MapV.redrawSoon(); };
 function setStatus(cls, a, b) { $('gpsbox').className = 'navbar ' + cls; $('st-line').textContent = a; $('st-sub').textContent = b; }
 
 // ---------- compass ----------
@@ -228,14 +243,30 @@ function compute() {
   const nextStop = S.toBusan ? C.find((c) => c.km > km + 0.3) : [...C].reverse().find((c) => c.km < km - 0.3);
   const nextLm = S.toBusan ? LM.find((l) => l.km > km + 0.3) : [...LM].reverse().find((l) => l.km < km - 0.3);
   const onPath = np.d <= Math.max(0.06, (h.acc || 10) / 1000 * 0.8);
-  return { h, np, km, prev, nxt, nextStop, nextLm, onPath };
+  const far = np.d > 40;
+  return { h, np, km, prev, nxt, nextStop, nextLm, onPath, far };
 }
 let lastClosest = 0, lastLmThumb = '';
 function update() {
   const I = S.info = compute(); if (!I) return;
   const { h, np, km, onPath } = I, ns = I.nextStop;
+  if (I.far) {
+    const st = C[0], dKm = hav(h.lat, h.lng, st.lat, st.lng);
+    setStatus('', 'Not on the route yet', `The route starts in Incheon, Korea · ${Math.round(dKm).toLocaleString()} km away`);
+    drawArrow();
+    $('km-done').textContent = '0'; $('km-left').textContent = TOTAL; $('next-km-short').textContent = '—'; $('progbar').style.width = '0%';
+    $('next-num').textContent = '1'; $('next-name').textContent = C[0].en; $('next-ko').textContent = C[0].ko; $('next-km').textContent = 'Start of the route';
+    $('between').textContent = 'You are not near the bike route right now. Everything will work once you are in Korea.';
+    $('path-dir').textContent = 'Use Help → Practice mode to try the app at home.'; $('path-dist').textContent = '';
+    $('lm-name').textContent = LM[0].en; $('lm-sub').textContent = 'At the start line';
+    renderTonight(); if (S.view === 'ride') MapV.redrawSoon(); return;
+  }
   const nsTxt = ns ? `Next: ${ns.en} · ${fmtD(Math.abs(ns.km - km))}` : 'You made it to the finish!';
-  if (onPath) setStatus('on', S.sim ? 'On route · practice' : 'On route', nsTxt);
+  $('guidebar').classList.toggle('hidden', !S.target);
+  if (S.target) {
+    const t = S.target, d = hav(h.lat, h.lng, t.lat, t.lng), b = bearing(h.lat, h.lng, t.lat, t.lng);
+    setStatus('guide', d < 0.04 ? 'You have arrived' : `${fmtD(d)} ${SHORT[card8(b)]}`, `To ${t.name} · straight-line`);
+  } else if (onPath) setStatus('on', S.sim ? 'On route · practice' : 'On route', nsTxt);
   else { const b = bearing(h.lat, h.lng, np.lat, np.lng); setStatus('off', `Path ${fmtD(np.d)} ${SHORT[card8(b)]}`, `Head ${DIRS[card8(b)]} to rejoin · ${nsTxt}`); }
   drawArrow();
   $('between').textContent = `Between stop ${I.prev.n} ${I.prev.en} and stop ${I.nxt.n} ${I.nxt.en}`;
@@ -305,6 +336,12 @@ function drawArrow() {
   ctx.clearRect(0, 0, W, W);
   ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.beginPath(); ctx.arc(W / 2, W / 2, W / 2 - 2, 0, 7); ctx.fill();
   if (!I) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(W / 2, W / 2, 9, 0, 7); ctx.fill(); return; }
+  if (S.target) {
+    const b = bearing(I.h.lat, I.h.lng, S.target.lat, S.target.lng);
+    ctx.save(); ctx.translate(W / 2, W / 2); ctx.rotate((S.heading != null ? b - S.heading : b) * RAD); ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(0, -W * .33); ctx.lineTo(W * .24, W * .27); ctx.lineTo(0, W * .14); ctx.lineTo(-W * .24, W * .27); ctx.closePath(); ctx.fill(); ctx.restore(); return;
+  }
+  if (I.far) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '700 40px -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈', W / 2, W / 2 + 2); return; }
   ctx.save(); ctx.translate(W / 2, W / 2);
   let rot;
   if (I.onPath) {
@@ -320,6 +357,8 @@ function drawArrow() {
 function setChip() { document.querySelectorAll('#chips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.cat === S.nearCat && !$('search').value.trim())); }
 document.querySelectorAll('#chips .chip').forEach((c) => c.onclick = () => { S.nearCat = +c.dataset.cat; $('search').value = ''; setChip(); renderNear(); });
 let lastNear = 0;
+S.stayMode = 'ahead';
+document.querySelectorAll('#staymode button').forEach((b) => b.onclick = () => { S.stayMode = b.dataset.m; document.querySelectorAll('#staymode button').forEach((x) => x.classList.toggle('on', x === b)); renderNear(); });
 function arrowSvg(b) { const r = Math.round(S.heading != null ? b - S.heading : b); return `<span style="display:inline-block;transform:rotate(${r}deg)">${ico('nav').replace('<svg', '<svg width="16" height="16"')}</span>`; }
 function itemRow(o, h, myKm, i) {
   const d = h ? hav(h.lat, h.lng, o.lat, o.lng) : null, b = h ? bearing(h.lat, h.lng, o.lat, o.lng) : 0;
@@ -330,7 +369,7 @@ function itemRow(o, h, myKm, i) {
   else if (o.cat === -2) { iconCls = 'bgT'; iconName = 'pin'; }
   else if (o.cat === 6) { const p = !!PHOTO[o.lmEn]; iconCls = p ? 'bg8' : 'bg6'; iconName = p ? 'camera' : 'star'; }
   else { iconCls = 'bg' + o.cat; iconName = CAT[o.cat].i; }
-  if ([0, 1, 2, 3, 4, 5].includes(o.cat)) { const ds = descOf(o); line2 = [ds.en !== o.name ? ds.en : '', ds.type || ''].filter(Boolean).join(' · '); }
+  if ([0, 1, 2, 3, 4, 5].includes(o.cat)) { const ds = descOf(o); line2 = [ds.en !== o.name ? ds.en : '', ds.type || '', o.cat === 3 && PRICE[ds.type] ? PRICE[ds.type].split(' (')[0].split(' ·')[0] : '', o.cat === 3 && o.phone ? 'has phone' : ''].filter(Boolean).join(' · '); }
   else if (o.sub) line2 = o.sub;
   return `<div class="place" data-i="${i}"><div class="ic ${iconCls}">${ico(iconName)}</div>
     <div class="pn"><b>${esc(o.name)}</b>${line2 ? `<i class="en">${esc(line2)}</i>` : ''}<span>${rel}</span></div>
@@ -372,6 +411,7 @@ function renderNear(auto) {
     $('nearhead').textContent = items.length ? `${items.length >= 60 ? '60+' : items.length} results${h ? ' · closest first' : ''}` : `Nothing found for "${q}". Try another word, like noodles, motel or bike.`;
     renderList(items, h); return;
   }
+  if (cat !== 3) $('staymode').classList.add('hidden');
   if (cat === 9) {
     $('nearhead').textContent = '';
     $('nearlist').innerHTML = `<div style="padding:16px"><div class="card-title">Hospital or clinic</div>
@@ -392,7 +432,15 @@ function renderNear(auto) {
   else if (cat === 7) {
     items = C.map((c) => stopItem(c, h)).concat((D.riders || []).map((i) => { const p = P[i]; return { name: p[3], ko: p[3], lat: p[0], lng: p[1], cat: p[2], d: hav(h.lat, h.lng, p[0], p[1]) }; }));
     items.sort((a, b) => a.d - b.d); items = items.slice(0, 40); head = 'Where other riders stop: stamp booths and the cafés and stores right on the path';
+  } else if (cat === 3 && S.stayMode === 'ahead' && S.info && !S.info.far) {
+    const myK = S.info.km, dir = S.toBusan ? 1 : -1;
+    items = P.map((p) => (p[2] === 3 ? p : null)).filter(Boolean).map((p) => ({ p, k: kmAt(p[0], p[1]) }))
+      .filter(({ k }) => (k - myK) * dir > -0.5 && (k - myK) * dir < 70)
+      .sort((a, b) => (a.k - b.k) * dir).slice(0, 80)
+      .map(({ p, k }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat: 3, km: k, d: hav(h.lat, h.lng, p[0], p[1]) }));
+    head = 'Places to stay ahead of you on the route (next 70 km), in riding order';
   } else { items = nearestOf(cat, 40, h).map(({ p, d }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat, d })); head = `${CAT[cat].n} · closest first`; }
+  $('staymode').classList.toggle('hidden', cat !== 3);
   $('nearhead').textContent = head;
   renderList(items, h);
 }
@@ -557,8 +605,11 @@ async function dlStatus() {
   const pct = Math.round((c.tiles / c.totalTiles) * 100);
   $('dlstat').innerHTML = `Terrain ${pct}% · Photos ${c.photoPlaces}/${LM.length} places · Sign reader ${ocr ? 'ready' : 'not yet'}`;
   $('dlbar').style.width = Math.round((pct + c.photoPlaces / LM.length * 100 + (ocr ? 100 : 0)) / 3) + '%';
-  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && ocr;
+  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && c.typePhotos >= c.typeTotal - 4 && ocr;
   $('btn-dl').innerHTML = all ? ico('check') + ' Everything downloaded' : ico('download') + ' Download now';
+  $('dlstat').innerHTML = `<div class="dlrow">${ico(pct >= 98 ? 'check' : 'download')} Terrain map <b>${pct}%</b></div><div class="dlrow">${ico(c.photoPlaces >= LM.length - 3 ? 'check' : 'download')} Landmark photos <b>${c.photoPlaces} of ${LM.length}</b></div><div class="dlrow">${ico(c.typePhotos >= c.typeTotal - 4 ? 'check' : 'download')} Food &amp; stay photos <b>${c.typePhotos} of ${c.typeTotal}</b></div><div class="dlrow">${ico(ocr ? 'check' : 'download')} Sign reader <b>${ocr ? 'ready' : 'not yet'}</b></div>`;
+  S.dlAll = all; offlineBadge();
+  return all;
 }
 $('btn-dl').onclick = async () => {
   if (!navigator.onLine) { $('dlstat').textContent = 'You need wifi for this one-time download.'; return; }
@@ -598,11 +649,14 @@ const MapV = (() => {
   const visible = [];
   const dark = () => document.documentElement.dataset.theme === 'dark';
   function label(t, X, Y, col) { ctx.font = '600 12.5px -apple-system, "Apple SD Gothic Neo", sans-serif'; ctx.lineWidth = 3.5; ctx.strokeStyle = dark() ? 'rgba(10,16,24,.9)' : 'rgba(255,255,255,.95)'; ctx.strokeText(t, X, Y); ctx.fillStyle = dark() ? '#e8eef5' : col; ctx.fillText(t, X, Y); }
-  function draw() {
+  function draw() { try { drawInner(); } catch (e) { console.warn('map draw', e); } }
+  function drawInner() {
     if (!ctx) return; visible.length = 0;
     ctx.fillStyle = dark() ? '#16201c' : '#eef2ee'; ctx.fillRect(0, 0, W, H);
     const sc = scale(), pad = 40;
-    if (terrainOn && window.TERRAIN) {
+    const tAlpha = v.z <= 12 ? 1 : v.z >= 14 ? 0 : 1 - (v.z - 12) / 2;
+    if (terrainOn && window.TERRAIN && tAlpha > 0) {
+      ctx.save(); ctx.globalAlpha = tAlpha; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
       const tz = Math.max(7, Math.min(12, Math.round(v.z))), n = 2 ** tz, tp = sc / n;
       const x0 = Math.floor((v.x - W / 2 / sc) * n), x1 = Math.floor((v.x + W / 2 / sc) * n), y0 = Math.floor((v.y - H / 2 / sc) * n), y1 = Math.floor((v.y + H / 2 / sc) * n);
       if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 48) for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
@@ -614,6 +668,7 @@ const MapV = (() => {
         }
       }
       ctx.fillStyle = dark() ? 'rgba(8,14,22,.55)' : 'rgba(255,255,255,.12)'; ctx.fillRect(0, 0, W, H);
+      ctx.restore();
     }
     // bike path
     for (const pass of [0, 1]) {
@@ -633,7 +688,7 @@ const MapV = (() => {
         if (big) { const im = IC.mapIcon(CAT[c].i, CAT[c].col, 30, iconReady); if (im) ctx.drawImage(im, X - 13, Y - 13, 26, 26); }
         else { ctx.fillStyle = CAT[c].col; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X, Y, 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
         visible.push({ X, Y, kind: 'poi', i });
-        if (big && v.z >= 16.5) { ctx.textAlign = 'center'; label(P[i][3].slice(0, 16), X, Y + 24, '#3c4a5b'); }
+        if (big && v.z >= 16.5) { ctx.textAlign = 'center'; label(String(P[i][3] || '').slice(0, 16), X, Y + 24, '#3c4a5b'); }
       }
     }
     // landmarks
@@ -659,6 +714,13 @@ const MapV = (() => {
       if (v.z >= 9) label(c.en, X, Y - r - 10, '#9b1c13');
       visible.push({ X, Y, kind: 'stop', i });
     });
+    // guide line to target
+    const hh = here();
+    if (hh && S.target) {
+      const X0 = sx(wx(hh.lng)), Y0 = sy(wy(hh.lat)), X1 = sx(wx(S.target.lng)), Y1 = sy(wy(S.target.lat));
+      ctx.save(); ctx.setLineDash([8, 7]); ctx.strokeStyle = '#6741d9'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(X0, Y0); ctx.lineTo(X1, Y1); ctx.stroke(); ctx.restore();
+      const im = IC.mapIcon('pin', '#6741d9', 36, iconReady); if (im) ctx.drawImage(im, X1 - 16, Y1 - 16, 32, 32);
+    }
     // me
     const h = here();
     if (h) {
@@ -726,12 +788,19 @@ const MapV = (() => {
   }
   function goto(lat, lng, z) { resize(); v.inited = true; v.z = z || 14; v.x = wx(lng); v.y = wy(lat) - yOff() / scale(); setFollow(false); draw(); }
   let gotFix = false;
-  function firstFix() { if (gotFix) return; gotFix = true; v.inited = true; v.z = 14.5; setFollow(true); }
+  function firstFix() { if (gotFix) return; gotFix = true; v.inited = true; const h = here(); if (h && nearestOnPath(h.lat, h.lng).d > 40) { resize(); fitAll(); setFollow(false); return; } v.z = 14.5; setFollow(true); }
   function follow() { const h = here(); if (!h) return; v.inited = true; v.z = Math.max(v.z, 14.5); setFollow(true); }
   return { open, goto, redrawSoon, follow, firstFix };
 })();
 
 // ---------- offline status ----------
+function offlineBadge() {
+  const b = $('netbadge');
+  if (!S.appSaved) { b.textContent = navigator.onLine ? 'Saving app…' : 'Not saved'; b.className = 'netbadge warn'; }
+  else if (!S.dlAll) { b.textContent = 'Downloads needed ›'; b.className = 'netbadge warn'; }
+  else { b.textContent = '✓ Fully offline'; b.className = 'netbadge ok'; }
+}
+$('netbadge').onclick = (e) => { e.stopPropagation(); show('help'); setTimeout(() => $('dlcard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); };
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'offline.js', 'icons.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 async function offlineStatus() {
   const b = $('netbadge');
@@ -739,8 +808,8 @@ async function offlineStatus() {
     if (!('serviceWorker' in navigator) || !window.caches) { b.textContent = ''; return; }
     const keys = await caches.keys(); let have = 0;
     for (const a of ASSETS) { for (const k of keys) { if (await (await caches.open(k)).match(a)) { have++; break; } } }
-    if (have === ASSETS.length) b.textContent = 'Offline ready';
-    else { b.textContent = navigator.onLine ? 'Saving…' : 'Not saved'; setTimeout(offlineStatus, 2500); }
+    S.appSaved = have === ASSETS.length; offlineBadge();
+    if (!S.appSaved) setTimeout(offlineStatus, 2500);
   } catch (e) { b.textContent = ''; }
 }
 if ('serviceWorker' in navigator) {

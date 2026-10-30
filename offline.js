@@ -35,6 +35,22 @@ const Q = {
   'Nakdong Rail Park & Wine Cave': ['김해낙동강레일파크', 'Gimhae Nakdonggang Rail Park'], 'Imgyeongdae Pavilion': ['임경대', 'Imgyeongdae Yangsan'],
   'Nakdong Estuary Barrage (FINISH)': ['낙동강하굿둑', 'Nakdong River estuary barrage']
 };
+// What each kind of food / stay looks like (Korean Wikipedia article, then Commons search).
+const TYPE_Q = {
+  'Korean BBQ (grill meat at the table)': ['삼겹살', 'Samgyeopsal'], 'Korean fried chicken': ['프라이드 치킨', 'Korean fried chicken'],
+  'Pizza': ['피자', 'Pizza Korea'], 'Burgers': ['햄버거', 'Hamburger'], 'Chinese-Korean (black-bean noodles, fried rice)': ['짜장면', 'Jajangmyeon'],
+  'Raw fish (sashimi) & seafood': ['생선회', 'Hoe Korean raw fish'], 'River-fish stew (spicy)': ['추어탕', 'Chueo-tang'], 'Grilled eel': ['장어구이', 'Grilled eel Korea'],
+  'Hot soup with rice': ['국밥', 'Gukbap'], 'Noodles / noodle soup': ['칼국수', 'Kalguksu'], 'Quick snacks: gimbap rolls, spicy rice cakes': ['김밥', 'Gimbap'],
+  'Pork cutlet (not spicy)': ['돈가스', 'Donkatsu'], 'Japanese food': ['초밥', 'Sushi'], 'Tofu dishes': ['순두부찌개', 'Sundubu-jjigae'],
+  'Korean home-style meals with side dishes': ['반찬', 'Banchan'], 'Korean soups & stews': ['김치찌개', 'Kimchi-jjigae'], 'Seafood': ['해물탕', 'Haemul-tang'],
+  'Dumplings': ['만두', 'Mandu dumplings'], 'Rice porridge (gentle on the stomach)': ['전복죽', 'Juk porridge Korea'], 'Bakery': ['제과점', 'Bakery Korea'],
+  'Café': ['카페', 'Cafe Korea'], 'Pub (drinks + bar food)': ['포장마차', 'Pojangmacha'], 'Western food': ['파스타', 'Pasta dish'],
+  'Asian (Vietnamese / Thai / Indian)': ['쌀국수', 'Pho'], 'Korean restaurant': ['한정식', 'Hanjeongsik'], 'Chicken or duck dishes (stew, grilled, ginseng soup)': ['삼계탕', 'Samgyetang'],
+  'Goat stew': ['흑염소', 'Korean stew'], 'Desserts & sweet snacks': ['빙수', 'Bingsu'], 'Fish cakes (Busan snack)': ['어묵', 'Eomuk'],
+  'Motel': ['모텔', 'Motel room South Korea'], 'Hotel': ['호텔', 'Hotel room Korea'], 'Pension (guesthouse, often with kitchen)': ['펜션', 'Pension Korea accommodation'],
+  'Homestay / B&B': ['민박', 'Minbak Korea'], 'Guesthouse': ['게스트하우스', 'Guesthouse Korea'], 'Sauna / jjimjilbang (cheap overnight)': ['찜질방', 'Jjimjilbang'],
+  'Campground': ['야영장', 'Campground South Korea'], 'Old-style inn (cheap)': ['여관', 'Yeogwan Korea'], 'Resort': ['리조트', 'Resort South Korea'], 'Place to stay': ['모텔', 'Motel room South Korea']
+};
 const BAD = /(logo|map|지도|위치|icon|flag|emblem|seal|symbol|locat|문장|signature|coat_of_arms|diagram|plan|도면|svg|기호|약도|route|노선)/i;
 const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
 async function j(url) { const r = await fetch(url, { mode: 'cors' }); if (!r.ok) throw new Error(r.status); return r.json(); }
@@ -51,8 +67,8 @@ function pickFiles(pages, have) {
   return out;
 }
 const II = 'prop=imageinfo&iiprop=url|mime|size|extmetadata&iiurlwidth=900&iiextmetadatafilter=Artist|LicenseShortName';
-async function findPhotos(en) {
-  const [ko, cq] = Q[en] || [en, en]; let photos = [];
+async function findPhotos(en, qq, max) {
+  const [ko, cq] = qq || Q[en] || [en, en]; let photos = [];
   try {
     const s = await j(`https://ko.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srsearch=${encodeURIComponent(ko)}&srlimit=1&srnamespace=0`);
     const title = s.query && s.query.search && s.query.search[0] && s.query.search[0].title;
@@ -67,17 +83,17 @@ async function findPhotos(en) {
       photos = photos.concat(pickFiles(r.query && r.query.pages, photos));
     } catch (e) {}
   }
-  return photos.slice(0, 5);
+  return photos.slice(0, max || 5);
 }
 async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) { const k = i++; await fn(items[k], k); } })); }
 
 const Off = {
   status: { terrain: 0, terrainTotal: 0, photos: 0, photosTotal: D.landmarks.length, running: false },
   async counts() {
-    const out = { tiles: 0, totalTiles: tileList().length, photoPlaces: 0 };
+    const out = { tiles: 0, totalTiles: tileList().length, photoPlaces: 0, typePhotos: 0, typeTotal: Object.keys(TYPE_Q).length };
     try {
       const tc = await caches.open(TCACHE); out.tiles = (await tc.keys()).length;
-      const meta = await Off.meta(); out.photoPlaces = Object.values(meta).filter((a) => a.length).length;
+      const meta = await Off.meta(); out.photoPlaces = Object.entries(meta).filter(([k, a]) => !k.startsWith('type:') && a.length).length; out.typePhotos = Object.entries(meta).filter(([k, a]) => k.startsWith('type:') && a.length).length; out.typeTotal = Object.keys(TYPE_Q).length;
     } catch (e) {}
     return out;
   },
@@ -85,7 +101,7 @@ const Off = {
   async download(onProgress) {
     if (Off.status.running) return; Off.status.running = true;
     const tiles = tileList(); const tc = await caches.open(TCACHE); const pc = await caches.open(PCACHE);
-    let done = 0, failed = 0; const total = tiles.length + D.landmarks.length + 1;
+    let done = 0, failed = 0; const total = tiles.length + D.landmarks.length + Object.keys(TYPE_Q).length + 1;
     const tick = (msg) => onProgress && onProgress({ done, total, failed, msg });
     await pool(tiles, 6, async (k) => {
       const [z, x, y] = k.split('/').map(Number), url = TILE_URL(z, x, y);
@@ -101,15 +117,24 @@ const Off = {
       } catch (e) { failed++; }
       done++; tick('Photos');
     });
+    await pool(Object.keys(TYPE_Q), 3, async (t) => {
+      try {
+        const key = 'type:' + t; let photos = meta[key];
+        if (!photos || !photos.length) { photos = await findPhotos(t, TYPE_Q[t], 2); meta[key] = photos; }
+        for (const p of photos) { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); } }
+      } catch (e) { failed++; }
+      done++; if (done % 4 === 0) tick('Food & stay photos');
+    });
     try { tick('Sign reader'); await Ocr.prepare(); } catch (e) { failed++; }
     await pc.put(META_URL, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
     done++; Off.status.running = false; tick('Done');
     return { done, total, failed };
   },
   // photos for one landmark as object URLs (offline), or live if online and not saved
-  async photos(en) {
-    const meta = await Off.meta(); let list = meta[en];
-    if ((!list || !list.length) && navigator.onLine) { try { list = await findPhotos(en); } catch (e) { list = []; } }
+  async photos(en, type) {
+    const key = type ? 'type:' + type : en;
+    const meta = await Off.meta(); let list = meta[key];
+    if ((!list || !list.length) && navigator.onLine && (!type || TYPE_Q[type])) { try { list = type ? await findPhotos(type, TYPE_Q[type], 2) : await findPhotos(en); } catch (e) { list = []; } }
     const pc = await caches.open(PCACHE).catch(() => null); const out = [];
     for (const p of list || []) {
       let src = null;
@@ -123,7 +148,7 @@ const Off = {
 
 // ---------- terrain rendering (hillshade + height colors) ----------
 const mem = new Map(), loading = new Set();
-const STOPS = [[-50, [168, 203, 232]], [0.5, [168, 203, 232]], [1, [214, 232, 205]], [60, [198, 225, 180]], [200, [214, 222, 168]], [400, [222, 205, 160]], [700, [200, 175, 140]], [1100, [176, 150, 125]], [1600, [235, 235, 235]]];
+const STOPS = [[-50, [168, 203, 232]], [-1, [168, 203, 232]], [0, [214, 232, 205]], [60, [198, 225, 180]], [200, [214, 222, 168]], [400, [222, 205, 160]], [700, [200, 175, 140]], [1100, [176, 150, 125]], [1600, [235, 235, 235]]];
 function colorFor(e) {
   for (let i = 1; i < STOPS.length; i++) { if (e <= STOPS[i][0]) { const [e0, c0] = STOPS[i - 1], [e1, c1] = STOPS[i]; const t = Math.max(0, Math.min(1, (e - e0) / (e1 - e0))); return [c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t, c0[2] + (c1[2] - c0[2]) * t]; } }
   return STOPS[STOPS.length - 1][1];
@@ -143,7 +168,7 @@ async function shade(blob, z, y) {
     const slope = Math.atan(Math.hypot(dzdx, dzdy)), aspect = Math.atan2(dzdy, -dzdx);
     let hs = Math.sin(alt) * Math.cos(slope) + Math.cos(alt) * Math.sin(slope) * Math.cos(az - Math.PI / 2 - aspect);
     hs = 0.55 + 0.6 * Math.max(0, hs);
-    const e = el[yy * W + xx], col = colorFor(e), i = 4 * (yy * W + xx), k = e <= 0.5 ? 1 : hs;
+    const e = el[yy * W + xx], col = colorFor(e), i = 4 * (yy * W + xx), k = e < -1 ? 1 : hs;
     o[i] = Math.min(255, col[0] * k); o[i + 1] = Math.min(255, col[1] * k); o[i + 2] = Math.min(255, col[2] * k); o[i + 3] = 255;
   }
   ctx.putImageData(out, 0, 0); return c;
@@ -205,5 +230,6 @@ const Ocr = {
   async prepare() { await ocrReady(); }
 };
 window.OCR = Ocr;
+Off.hasType = (t) => !!TYPE_Q[t];
 window.OFFLINE = Off; window.TERRAIN = Terrain;
 })();
