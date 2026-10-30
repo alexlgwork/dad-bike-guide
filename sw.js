@@ -1,5 +1,5 @@
 // Saves the whole app on the phone so it works with no signal.
-const CACHE = 'bike-korea-v8';
+const CACHE = 'bike-korea-v10';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'offline.js', 'icons.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', (e) => {

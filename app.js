@@ -143,6 +143,38 @@ const PRICE = {
   'Old-style inn (cheap)': 'Usually ₩30,000–50,000 (older, simpler rooms)', 'Homestay / B&B': 'Usually ₩30,000–60,000', 'Place to stay': 'Motels are usually ₩40,000–70,000 per room'
 };
 const priceFor = (type) => PRICE[type] || 'Prices vary — ask at the desk';
+// Prices reported by riders on Korea by Bike's recommended-stays list (submitted 2023). Matched to the map by name and location.
+const RIDER_STAYS = [
+  { name: '동남장', lat: 37.5456, lng: 127.32108, price: '₩30,000', note: 'Near Dumulmeori in Yangsu; several motels nearby.' },
+  { name: '티파니모텔', lat: 37.49122, lng: 127.49051, price: '₩50,000–70,000', note: 'Downtown Yangpyeong near the station, with many other motels around.' },
+  { name: '프린스', lat: 37.29725, lng: 127.63644, price: '₩45,000–55,000', note: 'Downtown Yeoju near City Hall, many other motels nearby.' },
+  { name: '사이판온천호텔', lat: 36.8465, lng: 127.98793, price: '₩40,000–75,000', note: 'Hot-spring hotel in Suanbo.' },
+  { name: '새재파크여관', lat: 36.76584, lng: 127.99512, price: '₩35,000', note: 'Older motel in Yeonpung, one of the last places to stay in town before Ihwaryeong.' },
+  { name: '진욱이별장자전거게스트하우스', lat: 36.69306, lng: 128.12129, price: '₩25,000', note: 'Guesthouse made for cyclists.' },
+  { name: '상풍교한옥게스트하우스민박', lat: 36.49594, lng: 128.26174, price: '₩60,000–70,000', note: 'Traditional hanok at the Saejae/Nakdong junction, built for long-distance riders. Breakfast and dinner included. Phone ahead — small and often full. Not in a town.' },
+  { name: '맥스호텔', lat: 35.16432, lng: 128.98022, price: '₩40,000–60,000', note: 'Near Busan Central Bus Terminal (Sasang), a few blocks from the path, about 8 km before the finish.' }
+];
+// Nightly prices seen on booking sites (Hotels.com, Expedia, Trip.com, Booking.com, Kayak), 2024–2026. 1 USD ≈ ₩1,400.
+const TOWN_BEDS = [
+  { stop: 7, town: 'Yangpyeong', ko: '양평', txt: 'Motels ₩30,000–70,000 (~$22–50). Lots near Yangpyeong Station.' },
+  { stop: 9, town: 'Yeoju', ko: '여주', txt: 'Motels ₩45,000–70,000 (~$32–50). SunValley Hotel ~$66–95 — riders say it lets you keep the bike in the room.' },
+  { stop: 11, town: 'Angseong (Binaeseom)', ko: '앙성', txt: 'Very few beds — a pension around ₩55,000. Plan to reach Chungju instead.' },
+  { stop: 12, town: 'Chungju', ko: '충주', txt: 'Motels average ~₩50,000 (~$38); hotels ~₩100,000 (~$71).' },
+  { stop: 13, town: 'Suanbo hot springs', ko: '수안보', txt: 'Hot-spring hotels ₩35,000–60,000 (~$26–45); nicer ones ~$75. Good night before the climbs.' },
+  { stop: 14, town: 'Yeonpung (before Ihwaryeong)', ko: '연풍', txt: 'Almost nothing — one old inn ~₩35,000. Sleep in Suanbo or push on to Mungyeong.' },
+  { stop: 15, town: 'Mungyeong · Jeomchon', ko: '점촌', txt: 'Motels by Jeomchon Station ₩28,000–60,000 (~$20–45). Amor Motel is popular with cyclists.' },
+  { stop: 17, town: 'Sangju', ko: '상주', txt: 'Motels ₩32,000–50,000 (~$23–37). Hanok guesthouse at Sangpung Bridge ₩60,000–70,000 with dinner & breakfast.' },
+  { stop: 19, town: 'Gumi', ko: '구미', txt: 'Motels from ~₩20,000; most ₩35,000–75,000 (~$25–55).' },
+  { stop: 20, town: 'Chilgok · Waegwan', ko: '왜관', txt: 'Motels ₩20,000–48,000 (~$15–35). Twelve Motel ~$32 with breakfast; Centro Hotel ~$52–66.' },
+  { stop: 22, town: 'Daegu Dalseong · Hyeonpung', ko: '현풍', txt: 'Motels ₩35,000–60,000 (~$25–45). Riders report motels here letting bikes in the room.' },
+  { stop: 24, town: 'Namji · Changnyeong', ko: '남지', txt: 'Motels ₩40,000–55,000 (~$30–40).' },
+  { stop: 25, town: 'Samnangjin · Mulgeum (Yangsan)', ko: '물금', txt: 'Motels ₩40,000–52,000 (~$28–38), several by Mulgeum Station.' },
+  { stop: 26, town: 'Busan · Sasang', ko: '사상', txt: 'Motels by the West Bus Terminal ₩35,000–50,000 (~$26–36).' }
+];
+const townBedsNear = (lat, lng) => { let best = null, bd = 18; TOWN_BEDS.forEach((t) => { const c = C[t.stop - 1]; const d = hav(lat, lng, c.lat, c.lng); if (d < bd) { bd = d; best = t; } }); return best; };
+const riderPick = (o) => RIDER_STAYS.find((r) => r.name === o.name && Math.abs(r.lat - o.lat) < 0.002 && Math.abs(r.lng - o.lng) < 0.002);
+// Typical food prices (2026 travel guides) — only where we have a source.
+const FOODPRICE = { 'Korean restaurant': 'A meal like bibimbap: about ₩10,000–16,000', 'Korean home-style meals with side dishes': 'About ₩10,000–16,000 per person', 'Korean fried chicken': 'A whole chicken: about ₩18,000–28,000', 'Café': 'Coffee about ₩5,000–8,000' };
 
 async function fillPhotos(el, en, type) {
   if (!window.OFFLINE || !el) return;
@@ -162,19 +194,23 @@ function placeSheet(o) {
   const catKey = o.cat === -1 ? null : (o.lmEn && PHOTO[o.lmEn] ? 8 : o.cat);
   const icon = o.cat === -1 ? `<div class="num">${o.stop ? o.stop.n : ''}</div>` : `<div class="ic bg${catKey}">${ico(CAT[catKey] ? CAT[catKey].i : 'pin')}</div>`;
   const tip = o.lmEn && PHOTO[o.lmEn];
+  const rp = o.cat === 3 ? riderPick(o) : null;
+  const fp = dsc && FOODPRICE[dsc.type];
   let meta = '';
   if (h) { const d = hav(h.lat, h.lng, o.lat, o.lng), b = bearing(h.lat, h.lng, o.lat, o.lng); meta += `<div><b>${fmtD(d)}</b><span>${DIRS[card8(b)]} of you</span></div>`; }
   meta += `<div><b>km ${Math.round(km)}</b><span>on the route</span></div><div><b>${off > 0.15 ? fmtD(off) : 'On path'}</b><span>${off > 0.15 ? 'off the bike path' : 'right beside it'}</span></div>`;
   sheet(`<div class="sh-head">${icon}<div><div class="over">${o.cat === -1 ? 'Stamp booth' : (CAT[catKey] ? CAT[catKey].n : '')}</div><h3>${esc(o.name)}</h3></div></div>
     ${biz && dsc.en !== o.name ? `<div class="sh-en">${esc(dsc.en)}</div>` : ''}
     ${o.ko && o.ko !== o.name ? `<div class="sh-ko">${esc(o.ko)}</div>` : ''}
+    ${fp ? `<div class="rc-sub" style="margin:2px 0 6px">Typical price: ${esc(fp)}</div>` : ''}
     ${dsc && dsc.type ? `<div class="sh-type">${ico(CAT[o.cat].i)} ${esc(dsc.type)}</div>${dsc.chain ? '' : '<div class="rc-sub" style="margin:-4px 0 6px">Type guessed from the name</div>'}` : ''}
     <div class="sh-meta">${meta}</div>
     ${o.lmEn || (dsc && dsc.type && window.OFFLINE && window.OFFLINE.hasType(dsc.type)) ? '<div id="sheetphotos" class="photos"></div>' : ''}
     ${tip ? `<div class="tip">${ico('camera')}<div><b>Photo tip</b> — ${esc(tip)}</div></div>` : ''}
     ${o.desc ? `<p class="desc">${esc(o.desc)}</p>` : ''}
     ${o.phone ? `<a class="btn" href="tel:${esc(o.phone.replace(/[^0-9+]/g, ''))}">${ico('phone')} Call ${esc(o.phone)}</a>` : ''}
-    ${o.cat === 3 ? `<div class="price">${ico('bed')}<div><b>Typical price</b><span>${esc(priceFor(dsc.type))}</span><small>A rough guide, not this place's price. Most motels take walk-ins; cash or card.</small></div></div>
+    ${o.cat === 3 ? (rp ? `<div class="price pick">${ico('star')}<div><b>Rider pick · reported price</b><span>${esc(rp.price)} per night</span><small>${esc(rp.note)} Reported by riders in 2023 (Korea by Bike) — may have changed.</small></div></div>` : `<div class="price">${ico('bed')}<div><b>Typical price</b><span>${esc(priceFor(dsc.type))}</span><small>A rough guide, not this place's price. Most motels take walk-ins; cash or card.</small></div></div>`) + `
+      ${(() => { const tb = townBedsNear(o.lat, o.lng); return tb ? `<div class="area-price"><b>Prices in ${esc(tb.town)}</b> ${esc(tb.txt)}<small>Seen on booking sites 2024–26. Walk-in prices are usually similar; weekends and summer cost more.</small></div>` : ''; })()}
       <button class="btn primary" data-act="tonight">${ico('bed')} Save as tonight's stay</button>
       <div class="grid2"><button class="btn" data-act="bikein">${ico('speech')} Room + bike inside?</button><button class="btn" data-act="price">${ico('speech')} Ask the price</button></div>` : ''}
     <button class="btn ${o.cat === 3 ? '' : 'primary'}" data-act="guide">${ico('nav')} Guide me there</button>
@@ -369,10 +405,15 @@ function itemRow(o, h, myKm, i) {
   else if (o.cat === -2) { iconCls = 'bgT'; iconName = 'pin'; }
   else if (o.cat === 6) { const p = !!PHOTO[o.lmEn]; iconCls = p ? 'bg8' : 'bg6'; iconName = p ? 'camera' : 'star'; }
   else { iconCls = 'bg' + o.cat; iconName = CAT[o.cat].i; }
-  if ([0, 1, 2, 3, 4, 5].includes(o.cat)) { const ds = descOf(o); line2 = [ds.en !== o.name ? ds.en : '', ds.type || '', o.cat === 3 && PRICE[ds.type] ? PRICE[ds.type].split(' (')[0].split(' ·')[0] : '', o.cat === 3 && o.phone ? 'has phone' : ''].filter(Boolean).join(' · '); }
+  let pickTag = '';
+  if ([0, 1, 2, 3, 4, 5].includes(o.cat)) {
+    const ds = descOf(o), rp = o.cat === 3 ? riderPick(o) : null;
+    if (rp) pickTag = `<em class="pick-tag">${ico('star')} Rider pick · ${esc(rp.price)}</em>`;
+    line2 = [ds.en !== o.name ? ds.en : '', ds.type || '', o.cat === 3 && !rp && PRICE[ds.type] ? 'typically ' + PRICE[ds.type].split(' (')[0].split(' ·')[0].replace('Usually ', '') : '', o.cat === 3 && o.phone ? 'has phone' : ''].filter(Boolean).join(' · ');
+  }
   else if (o.sub) line2 = o.sub;
   return `<div class="place" data-i="${i}"><div class="ic ${iconCls}">${ico(iconName)}</div>
-    <div class="pn"><b>${esc(o.name)}</b>${line2 ? `<i class="en">${esc(line2)}</i>` : ''}<span>${rel}</span></div>
+    <div class="pn"><b>${esc(o.name)}</b>${pickTag}${line2 ? `<i class="en">${esc(line2)}</i>` : ''}<span>${rel}</span></div>
     ${h ? `<div class="pd"><b>${fmtD(d)}</b><span>${arrowSvg(b)}</span></div>` : ''}</div>`;
 }
 const lmItem = (l, h) => ({ name: l.en, ko: l.ko, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, cat: 6, lmEn: l.en, sub: l.ko + (PHOTO[l.en] ? ' · photo spot' : ''), d: h ? hav(h.lat, h.lng, l.lat, l.lng) : 0 });
@@ -381,7 +422,7 @@ function openItem(o) { if (o.stop) stopSheet(o.stop); else if (o.lmEn) lmSheet(L
 let SEARCH_IDX = null;
 function buildSearch() {
   if (SEARCH_IDX) return SEARCH_IDX;
-  SEARCH_IDX = P.map((p) => { const d = window.FOOD.describe(p[3], p[2]); return (p[3] + ' ' + d.en + ' ' + (d.type || '') + ' ' + CAT[p[2]].n + ' ' + CAT[p[2]].ko).toLowerCase(); });
+  SEARCH_IDX = P.map((p) => { const d = window.FOOD.describe(p[3], p[2]); const rp = p[2] === 3 && riderPick({ name: p[3], lat: p[0], lng: p[1] }); return (p[3] + ' ' + d.en + ' ' + (d.type || '') + ' ' + CAT[p[2]].n + ' ' + CAT[p[2]].ko + (rp ? ' rider pick recommended ' + rp.price : '')).toLowerCase(); });
   return SEARCH_IDX;
 }
 const SYN = { hotel: 'place to stay', motel: 'motel', bed: 'place to stay', room: 'place to stay', hostel: 'guesthouse', sleep: 'place to stay', stay: 'place to stay', repair: 'bike shop', bicycle: 'bike shop', mechanic: 'bike shop', tire: 'bike shop', bathroom: 'toilet', restroom: 'toilet', wc: 'toilet', coffee: 'café', cafe: 'café', store: 'convenience', shop: 'convenience', mart: 'convenience', meat: 'bbq', noodles: 'noodle', bread: 'bakery' };
@@ -438,7 +479,7 @@ function renderNear(auto) {
       .filter(({ k }) => (k - myK) * dir > -0.5 && (k - myK) * dir < 70)
       .sort((a, b) => (a.k - b.k) * dir).slice(0, 80)
       .map(({ p, k }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat: 3, km: k, d: hav(h.lat, h.lng, p[0], p[1]) }));
-    head = 'Places to stay ahead of you on the route (next 70 km), in riding order';
+    head = 'Places to stay ahead of you on the route (next 70 km), in riding order. Price guides by town are in the Route tab.';
   } else { items = nearestOf(cat, 40, h).map(({ p, d }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat, d })); head = `${CAT[cat].n} · closest first`; }
   $('staymode').classList.toggle('hidden', cat !== 3);
   $('nearhead').textContent = head;
@@ -473,7 +514,8 @@ function renderRoute() {
     html += `<div class="tl${passed ? ' passed' : ''}" data-i="${i}"><div class="rail"><div class="dot">${c.n}</div></div><div class="tl-body">
       <div class="tl-top"><b>${esc(c.en)}</b><span>km ${c.km}</span></div><div class="ko">${esc(c.ko)}</div>
       <div class="tags">${tags.join('')}</div>
-      ${lms.length ? `<div class="lms">${lms.map((l) => `<div>${ico(PHOTO[l.en] ? 'camera' : 'star')}${esc(l.en)} · km ${l.km}</div>`).join('')}</div>` : ''}</div></div>`;
+      ${lms.length ? `<div class="lms">${lms.map((l) => `<div>${ico(PHOTO[l.en] ? 'camera' : 'star')}${esc(l.en)} · km ${l.km}</div>`).join('')}</div>` : ''}
+      ${(() => { const tb = TOWN_BEDS.find((t) => t.stop === c.n); return tb ? `<div class="beds">${ico('bed')}<div><b>${esc(tb.town)}</b> ${esc(tb.txt)}</div></div>` : ''; })()}</div></div>`;
     CLIMBS.filter(([k]) => k >= c.km && k < nk).forEach(([k, t]) => { html += `<div class="tl note"><div class="rail"><div class="dot">${ico('mountain')}</div></div><div class="tl-body"><b>km ${k}</b> · ${t}</div></div>`; });
   });
   if (myKm != null && !placedMe) html += meRow();
