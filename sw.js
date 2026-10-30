@@ -1,9 +1,10 @@
 // Saves the whole app on the phone so it works with no signal.
-const CACHE = 'bike-korea-v11';
+const CACHE = 'bike-korea-v12';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'photos.js', 'offline.js', 'icons.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // 'reload' skips the browser's HTTP cache so a new version never mixes in an old copy of a file
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   // only drop old copies of the app itself — downloaded maps, photos and OCR (bk-* caches) must survive updates

@@ -1,7 +1,7 @@
 // Downloads terrain and landmark photos once (on wifi) and keeps them on the phone.
 (() => {
 const D = window.ROUTE_DATA;
-const TCACHE = 'bk-terrain-v1', PCACHE = 'bk-photos-v1', META_URL = './_photos/meta.json';
+const TCACHE = 'bk-terrain-v1', PCACHE = 'bk-photos-v1';
 const TILE_URL = (z, x, y) => `https://elevation-tiles-prod.s3.amazonaws.com/terrarium/${z}/${x}/${y}.png`;
 const RAD = Math.PI / 180;
 const tileOf = (lat, lng, z) => { const n = 2 ** z, s = Math.sin(lat * RAD); return [Math.floor((lng + 180) / 360 * n), Math.floor((0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n)]; };
@@ -14,129 +14,57 @@ function tileList() {
   }
   return out;
 }
-// Search words for each landmark's photos (Korean Wikipedia first, then Wikimedia Commons).
-const Q = {
-  'Jeongseojin (Start Line)': ['정서진', 'Jeongseojin Incheon'], 'Ara Maru Sky Walk': ['아라마루', 'Ara Maru Gyeongin Ara canal'],
-  'Seonyudo Park': ['선유도공원', 'Seonyudo Park'], "Jeoldusan Martyrs' Shrine": ['절두산 순교성지', 'Jeoldusan'],
-  'Yeouido Hangang Park': ['여의도한강공원', 'Yeouido Hangang Park'], 'Seoul National Cemetery': ['국립서울현충원', 'Seoul National Cemetery'],
-  'Floating Islands & Rainbow Fountain': ['세빛섬', 'Banpo Bridge Moonlight Rainbow Fountain'], 'Lotte World Tower': ['롯데월드타워', 'Lotte World Tower'],
-  'Amsa-dong Prehistoric Village': ['서울 암사동 유적', 'Amsa-dong prehistoric settlement'], 'Dasan Jeong Yak-yong Historic Site': ['정약용 유적지', 'Jeong Yak-yong tomb Namyangju'],
-  'Dumulmeori (Two Rivers Meet)': ['두물머리', 'Dumulmeori'], 'Pasaseong Fortress': ['여주 파사성', 'Pasaseong'],
-  "King Sejong's Royal Tomb": ['여주 영릉', 'Yeongneung Sejong tomb'], 'Silleuksa Temple': ['신륵사', 'Silleuksa'],
-  'Hangang Culture Center (Gangcheon Weir)': ['강천보', 'Gangcheon weir'], 'Chungju Goguryeo Stele': ['충주 고구려비', 'Chungju Goguryeo stele'],
-  'Jungangtap Central Pagoda': ['충주 탑평리 칠층석탑', 'Jungangtap Chungju'], 'Tangeumdae': ['탄금대', 'Tangeumdae'],
-  'Suju Palbong Rocks': ['수주팔봉', 'Suju Palbong'], 'Suanbo Hot Springs': ['수안보온천', 'Suanbo'],
-  'Ihwaryeong Pass (Highest Point)': ['이화령', 'Ihwaryeong'], 'Mungyeong Saejae Park': ['문경새재', 'Mungyeong Saejae'],
-  'Mungyeong Pottery Hall': ['문경 도자기', 'Mungyeong pottery'], 'Gyeongcheondae Lookout': ['경천대', 'Gyeongcheondae Sangju'],
-  'Sangju Bicycle Museum': ['상주자전거박물관', 'Sangju Bicycle Museum'], 'Nakdong River Biology Museum': ['국립낙동강생물자원관', 'Nakdonggang National Institute of Biological Resources'],
-  'Nakdan Weir Rock Buddha': ['낙단보', 'Nakdan weir'], 'Hill 303 Memorial (Waegwan)': ['303고지', 'Hill 303 Waegwan memorial'],
-  'The ARC & Gangjeong Weir': ['디아크', 'The ARC Daegu Gangjeong weir'], 'Dodong Seowon Academy': ['도동서원', 'Dodong Seowon'],
-  'Bakjin War Memorial': ['박진전쟁기념관', 'Bakjin Changnyeong'], 'Namji Canola Fields': ['남지 유채꽃', 'Namji canola Changnyeong'],
-  'Nakdong Rail Park & Wine Cave': ['김해낙동강레일파크', 'Gimhae Nakdonggang Rail Park'], 'Imgyeongdae Pavilion': ['임경대', 'Imgyeongdae Yangsan'],
-  'Nakdong Estuary Barrage (FINISH)': ['낙동강하굿둑', 'Nakdong River estuary barrage']
-};
-// What each kind of food / stay looks like (Korean Wikipedia article, then Commons search).
-const TYPE_Q = {
-  'Korean BBQ (grill meat at the table)': ['삼겹살', 'Samgyeopsal'], 'Korean fried chicken': ['프라이드 치킨', 'Korean fried chicken'],
-  'Pizza': ['피자', 'Pizza Korea'], 'Burgers': ['햄버거', 'Hamburger'], 'Chinese-Korean (black-bean noodles, fried rice)': ['짜장면', 'Jajangmyeon'],
-  'Raw fish (sashimi) & seafood': ['생선회', 'Hoe Korean raw fish'], 'River-fish stew (spicy)': ['추어탕', 'Chueo-tang'], 'Grilled eel': ['장어구이', 'Grilled eel Korea'],
-  'Hot soup with rice': ['국밥', 'Gukbap'], 'Noodles / noodle soup': ['칼국수', 'Kalguksu'], 'Quick snacks: gimbap rolls, spicy rice cakes': ['김밥', 'Gimbap'],
-  'Pork cutlet (not spicy)': ['돈가스', 'Donkatsu'], 'Japanese food': ['초밥', 'Sushi'], 'Tofu dishes': ['순두부찌개', 'Sundubu-jjigae'],
-  'Korean home-style meals with side dishes': ['반찬', 'Banchan'], 'Korean soups & stews': ['김치찌개', 'Kimchi-jjigae'], 'Seafood': ['해물탕', 'Haemul-tang'],
-  'Dumplings': ['만두', 'Mandu dumplings'], 'Rice porridge (gentle on the stomach)': ['전복죽', 'Juk porridge Korea'], 'Bakery': ['제과점', 'Bakery Korea'],
-  'Café': ['카페', 'Cafe Korea'], 'Pub (drinks + bar food)': ['포장마차', 'Pojangmacha'], 'Western food': ['파스타', 'Pasta dish'],
-  'Asian (Vietnamese / Thai / Indian)': ['쌀국수', 'Pho'], 'Korean restaurant': ['한정식', 'Hanjeongsik'], 'Chicken or duck dishes (stew, grilled, ginseng soup)': ['삼계탕', 'Samgyetang'],
-  'Goat stew': ['흑염소', 'Korean stew'], 'Desserts & sweet snacks': ['빙수', 'Bingsu'], 'Fish cakes (Busan snack)': ['어묵', 'Eomuk'],
-  'Motel': ['모텔', 'Motel room South Korea'], 'Hotel': ['호텔', 'Hotel room Korea'], 'Pension (guesthouse, often with kitchen)': ['펜션', 'Pension Korea accommodation'],
-  'Homestay / B&B': ['민박', 'Minbak Korea'], 'Guesthouse': ['게스트하우스', 'Guesthouse Korea'], 'Sauna / jjimjilbang (cheap overnight)': ['찜질방', 'Jjimjilbang'],
-  'Campground': ['야영장', 'Campground South Korea'], 'Old-style inn (cheap)': ['여관', 'Yeogwan Korea'], 'Resort': ['리조트', 'Resort South Korea'], 'Place to stay': ['모텔', 'Motel room South Korea']
-};
-// Real geotagged photos near each stamp booth ('stop:N') and top-pick stay ('stay:<name>'), chosen at build time (photos.js).
-const PP = window.PLACE_PHOTOS || {};
-const PP_ALL = Object.values(PP).flat();
-const BAD = /(logo|map|지도|위치|icon|flag|emblem|seal|symbol|locat|문장|signature|coat_of_arms|diagram|plan|도면|svg|기호|약도|route|노선)/i;
-const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
-async function j(url) { const r = await fetch(url, { mode: 'cors' }); if (!r.ok) throw new Error(r.status); return r.json(); }
-function pickFiles(pages, have) {
-  const out = [];
-  Object.values(pages || {}).forEach((p) => {
-    const ii = p.imageinfo && p.imageinfo[0]; if (!ii || !ii.thumburl) return;
-    if (!/jpe?g/i.test(ii.mime || '')) return;
-    if ((ii.width || 0) < 500 || BAD.test(p.title)) return;
-    if (have.some((h) => h.src === ii.thumburl)) return;
-    const em = ii.extmetadata || {};
-    out.push({ src: ii.thumburl, credit: strip(em.Artist && em.Artist.value) || 'Unknown author', lic: strip(em.LicenseShortName && em.LicenseShortName.value), page: ii.descriptionurl || '' });
-  });
-  return out;
-}
-const II = 'prop=imageinfo&iiprop=url|mime|size|extmetadata&iiurlwidth=900&iiextmetadatafilter=Artist|LicenseShortName';
-async function findPhotos(en, qq, max) {
-  const [ko, cq] = qq || Q[en] || [en, en]; let photos = [];
-  try {
-    const s = await j(`https://ko.wikipedia.org/w/api.php?action=query&format=json&origin=*&list=search&srsearch=${encodeURIComponent(ko)}&srlimit=1&srnamespace=0`);
-    const title = s.query && s.query.search && s.query.search[0] && s.query.search[0].title;
-    if (title) {
-      const r = await j(`https://ko.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&titles=${encodeURIComponent(title)}&generator=images&gimlimit=40&${II}`);
-      photos = pickFiles(r.query && r.query.pages, photos);
-    }
-  } catch (e) {}
-  if (photos.length < 4) {
-    try {
-      const r = await j(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=12&gsrsearch=${encodeURIComponent(cq + ' filetype:bitmap')}&${II}`);
-      photos = photos.concat(pickFiles(r.query && r.query.pages, photos));
-    } catch (e) {}
-  }
-  return photos.slice(0, max || 5);
-}
+// Hand-picked Wikimedia Commons photos, chosen at build time (photos.js): LANDMARK_PHOTOS by landmark name,
+// PLACE_PHOTOS near each stamp booth ('stop:N') and top-pick stay ('stay:<name>'). The download is this fixed list, so it always finishes.
+const LP = window.LANDMARK_PHOTOS || {}, PP = window.PLACE_PHOTOS || {};
+const LP_ALL = Object.values(LP).flat(), PP_ALL = Object.values(PP).flat();
 async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) { const k = i++; await fn(items[k], k); } })); }
 
 const Off = {
-  status: { terrain: 0, terrainTotal: 0, photos: 0, photosTotal: D.landmarks.length, running: false },
   async counts() {
-    const out = { tiles: 0, totalTiles: tileList().length, photoPlaces: 0, typePhotos: 0, typeTotal: Object.keys(TYPE_Q).length, placePhotos: 0, placeTotal: PP_ALL.length };
+    const tl = tileList();
+    const out = { tiles: 0, totalTiles: tl.length, lmPhotos: 0, lmTotal: LP_ALL.length, placePhotos: 0, placeTotal: PP_ALL.length };
     try {
-      const tc = await caches.open(TCACHE); out.tiles = (await tc.keys()).length;
-      const have = new Set((await (await caches.open(PCACHE)).keys()).map((r) => r.url)); out.placePhotos = PP_ALL.filter((p) => have.has(p.src)).length;
-      const meta = await Off.meta(); out.photoPlaces = Object.entries(meta).filter(([k, a]) => !k.startsWith('type:') && a.length).length; out.typePhotos = Object.entries(meta).filter(([k, a]) => k.startsWith('type:') && a.length).length; out.typeTotal = Object.keys(TYPE_Q).length;
+      // the map also saves tiles it shows while riding, so count only the ones on the download list
+      const tk = new Set((await (await caches.open(TCACHE)).keys()).map((r) => r.url));
+      out.tiles = tl.filter((k) => { const [z, x, y] = k.split('/'); return tk.has(TILE_URL(z, x, y)); }).length;
+      const have = new Set((await (await caches.open(PCACHE)).keys()).map((r) => r.url));
+      out.lmPhotos = LP_ALL.filter((p) => have.has(p.src)).length;
+      out.placePhotos = PP_ALL.filter((p) => have.has(p.src)).length;
     } catch (e) {}
     return out;
   },
-  async meta() { try { const c = await caches.open(PCACHE); const r = await c.match(META_URL); return r ? await r.json() : {}; } catch (e) { return {}; } },
   async download(onProgress) {
-    if (Off.status.running) return; Off.status.running = true;
-    const tiles = tileList(); const tc = await caches.open(TCACHE); const pc = await caches.open(PCACHE);
-    let done = 0, failed = 0; const total = tiles.length + D.landmarks.length + PP_ALL.length + 1;
-    const tick = (msg) => onProgress && onProgress({ done, total, failed, msg });
-    await pool(tiles, 6, async (k) => {
-      const [z, x, y] = k.split('/').map(Number), url = TILE_URL(z, x, y);
-      try { if (!(await tc.match(url))) { const r = await fetch(url, { mode: 'cors' }); if (r.ok) await tc.put(url, r); else failed++; } } catch (e) { failed++; }
-      done++; if (done % 5 === 0) tick('Terrain');
-    });
-    const meta = await Off.meta();
-    await pool(D.landmarks, 3, async (l) => {
-      try {
-        let photos = meta[l.en];
-        if (!photos || !photos.length) { photos = await findPhotos(l.en); meta[l.en] = photos; }
-        for (const p of photos) { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); } }
-      } catch (e) { failed++; }
-      done++; tick('Photos');
-    });
-    await pool(PP_ALL, 4, async (p) => {
-      try { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); else failed++; } } catch (e) { failed++; }
-      done++; if (done % 4 === 0) tick('Stop & hotel photos');
-    });
-    try { tick('Sign reader'); await Ocr.prepare(); } catch (e) { failed++; }
-    await pc.put(META_URL, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
-    done++; Off.status.running = false; tick('Done');
-    return { done, total, failed };
+    if (Off.running) return; Off.running = true;
+    try {
+      const tiles = tileList(); const tc = await caches.open(TCACHE); const pc = await caches.open(PCACHE);
+      let done = 0, failed = 0; const total = tiles.length + LP_ALL.length + PP_ALL.length + 1;
+      const tick = (msg) => onProgress && onProgress({ done, total, failed, msg });
+      await pool(tiles, 6, async (k) => {
+        const [z, x, y] = k.split('/').map(Number), url = TILE_URL(z, x, y);
+        try { if (!(await tc.match(url))) { const r = await fetch(url, { mode: 'cors' }); if (r.ok) await tc.put(url, r); else failed++; } } catch (e) { failed++; }
+        done++; if (done % 5 === 0) tick('Terrain');
+      });
+      const photo = (msg) => async (p) => {
+        try { if (!(await pc.match(p.src))) { const r = await fetch(p.src, { mode: 'cors' }); if (r.ok) await pc.put(p.src, r); else failed++; } } catch (e) { failed++; }
+        done++; if (done % 4 === 0) tick(msg);
+      };
+      await pool(LP_ALL, 4, photo('Landmark photos'));
+      await pool(PP_ALL, 4, photo('Stop & hotel photos'));
+      // free the space used by photos an older version searched for on the phone
+      const keep = new Set([...LP_ALL, ...PP_ALL].map((p) => p.src));
+      for (const r of await pc.keys()) if (!keep.has(r.url)) await pc.delete(r);
+      try { tick('Sign reader'); await Ocr.prepare(); } catch (e) { failed++; }
+      done++; tick('Done');
+      return { done, total, failed };
+    } finally { Off.running = false; }
   },
-  // photos for one landmark as object URLs (offline), or live if online and not saved
-  async photos(en, type) {
-    const key = type ? 'type:' + type : en;
-    const meta = await Off.meta(); let list = meta[key] || PP[key];
-    if ((!list || !list.length) && navigator.onLine && (!type || TYPE_Q[type]) && !/^(stop|stay):/.test(key)) { try { list = type ? await findPhotos(type, TYPE_Q[type], 2) : await findPhotos(en); } catch (e) { list = []; } }
+  has: (key) => !!(LP[key] || PP[key] || []).length,
+  // saved photos for a landmark or place as object URLs (offline), or straight from Commons when online and not saved yet
+  async photos(key) {
+    const list = LP[key] || PP[key] || [];
     const pc = await caches.open(PCACHE).catch(() => null); const out = [];
-    for (const p of list || []) {
+    for (const p of list) {
       let src = null;
       try { const r = pc && await pc.match(p.src); if (r) src = URL.createObjectURL(await r.blob()); } catch (e) {}
       if (!src && navigator.onLine) src = p.src;
@@ -195,7 +123,8 @@ const OCACHE = 'bk-ocr-v1';
 const OCR_FILES = {
   lib: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
   worker: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
-  core: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core-lstm.js'
+  // the .wasm.js build has the engine inside it; the plain .js build fetches a separate .wasm, which can't load from a blob URL
+  core: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core-lstm.wasm.js'
 };
 let ocrWorker = null, ocrBusy = null;
 async function blobUrlFor(url) {
@@ -211,7 +140,8 @@ async function ocrReady() {
       const u = await blobUrlFor(OCR_FILES.lib);
       await new Promise((ok, bad) => { const s = document.createElement('script'); s.src = u; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
     }
-    const workerPath = await blobUrlFor(OCR_FILES.worker), corePath = await blobUrlFor(OCR_FILES.core);
+    // Tesseract treats a corePath not ending in "js" as a folder and adds a file name, so mark the blob URL as a .js file
+    const workerPath = await blobUrlFor(OCR_FILES.worker), corePath = (await blobUrlFor(OCR_FILES.core)) + '#core.js';
     ocrWorker = await window.Tesseract.createWorker('kor', 1, { workerPath, corePath, workerBlobURL: false });
     return ocrWorker;
   })();
@@ -230,6 +160,5 @@ const Ocr = {
   async prepare() { await ocrReady(); }
 };
 window.OCR = Ocr;
-Off.hasType = (t) => !!TYPE_Q[t];
 window.OFFLINE = Off; window.TERRAIN = Terrain;
 })();

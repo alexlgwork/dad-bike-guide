@@ -12,10 +12,14 @@ Home Screen once on wifi; after that it must work with no signal.
 - `words.js` — Korean sign dictionary, towns with km, stop aliases, phrase cards.
 - `food.js` — Hangul romanization + food/lodging type guessed from the Korean name; chain names.
 - `offline.js` — one-time downloads to Cache Storage: terrain tiles (AWS Terrarium, z7–12 along the route),
-  Wikimedia Commons photos for landmarks, Tesseract OCR (Korean) from jsdelivr. (`TYPE_Q` type photos are no longer downloaded.)
-- `photos.js` — `PLACE_PHOTOS`: 61 hand-picked, free-licence Wikimedia Commons photos near stamp booths (`stop:N`) and
-  top-pick stays (`stay:<name>`), found by Commons geosearch then curated by hand (junk like cars/space/insects removed).
-  offline.js caches them in Download now; stop and stay sheets show them.
+  the fixed photo list in photos.js, Tesseract OCR (Korean) from jsdelivr — use the core's `.wasm.js` build and a
+  blob URL ending `#core.js` (plain `.js` core needs a separate .wasm that can't load from a blob). Nothing is searched for on the phone, so the
+  download always finishes; it also deletes cached photos no longer on the list. Terrain % counts only the download's tiles.
+- `photos.js` — hand-picked, free-licence Wikimedia Commons photos (credit shown in the app):
+  `PLACE_PHOTOS` (61) near stamp booths (`stop:N`) and top-pick stays (`stay:<name>`), found by Commons geosearch;
+  `LANDMARK_PHOTOS` (95, 27 of 35 landmarks) by landmark English name, from geosearch + name search, each checked by eye.
+  No usable free photo exists for: Jeongseojin, Gangcheon Weir, Mungyeong Pottery Hall, Gyeongcheondae, Sangju Bicycle
+  Museum, Bakjin, Nakdong Rail Park, Imgyeongdae — their sheets simply show no photos.
 - `icons.js` — line icon set + canvas map icons. `sw.js` — service worker (bump `CACHE` version on every release).
 
 ## Data sources (keep attribution in Help)

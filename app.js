@@ -309,11 +309,12 @@ function foodPrice(o, dsc) {
 
 const PP = window.PLACE_PHOTOS || {};
 const photoKey = (o) => o.photoKey || (o.cat === 3 && PP['stay:' + o.name] ? 'stay:' + o.name : null);
-async function fillPhotos(el, en, type, head) {
+async function fillPhotos(el, key, head) {
   if (!window.OFFLINE || !el) return;
   el.innerHTML = '<div class="rc-sub">Loading photos…</div>';
-  const ph = await window.OFFLINE.photos(en, type);
-  if (!ph.length) { el.innerHTML = type ? '' : `<div class="rc-sub">${navigator.onLine ? 'No photos found for this place.' : 'Photos not downloaded yet — Help → Download now (on wifi).'}</div>`; return; }
+  if (!window.OFFLINE.has(key)) { el.remove(); return; }
+  const ph = await window.OFFLINE.photos(key);
+  if (!ph.length) { el.innerHTML = '<div class="rc-sub">Photos not downloaded yet — Help → Download now (on wifi).</div>'; return; }
   el.innerHTML = `${head ? `<div class="typical">${esc(head)}</div>` : ''}<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
   el.querySelectorAll('img').forEach((im) => im.onclick = () => { $('show-ko').innerHTML = `<img class="bigimg" src="${im.src}">`; $('show-en').textContent = ph[+im.dataset.i].credit + ' · Wikimedia Commons'; $('show').classList.remove('hidden'); });
 }
@@ -364,7 +365,7 @@ function placeSheet(o) {
   const ci = sb.querySelector('[data-act=checkin]'); if (ci) ci.onclick = () => checkinSheet(o);
   const bi = sb.querySelector('[data-act=bikein]'); if (bi) bi.onclick = () => showCard('오늘 밤 1명 묵을 방 있어요?\n자전거를 방이나 안에 둘 수 있어요?', '"Do you have a room for one tonight? Can I keep my bike in the room or inside?"');
   if (o.lmEn) fillPhotos($('sheetphotos'), o.lmEn);
-  else if ($('sheetphotos')) fillPhotos($('sheetphotos'), photoKey(o), null, o.cat === -1 ? 'Real photos taken near this stop' : 'Real photos taken within 150 m of this place');
+  else if ($('sheetphotos')) fillPhotos($('sheetphotos'), photoKey(o), o.cat === -1 ? 'Real photos taken near this stop' : 'Real photos taken within 150 m of this place');
 }
 // Walk-in check-in at a Korean motel, step by step: [title, what to know, phrase to show at the desk or null].
 const CHECKIN = [
@@ -824,11 +825,12 @@ async function dlStatus() {
   if (!window.OFFLINE) return;
   const c = await window.OFFLINE.counts(), ocr = window.OCR ? await window.OCR.available() : false;
   const pct = Math.round((c.tiles / c.totalTiles) * 100);
-  $('dlstat').innerHTML = `Terrain ${pct}% · Photos ${c.photoPlaces}/${LM.length} places · Sign reader ${ocr ? 'ready' : 'not yet'}`;
-  $('dlbar').style.width = Math.round((pct + c.photoPlaces / LM.length * 100 + (ocr ? 100 : 0)) / 3) + '%';
-  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && c.placePhotos >= c.placeTotal - 5 && ocr;
+  // a photo or two can vanish from Commons over time, so allow a few missing
+  const tOk = pct >= 98, lOk = c.lmPhotos >= c.lmTotal - 5, pOk = c.placePhotos >= c.placeTotal - 5;
+  $('dlbar').style.width = Math.round((pct + c.lmPhotos / c.lmTotal * 100 + c.placePhotos / c.placeTotal * 100 + (ocr ? 100 : 0)) / 4) + '%';
+  const all = tOk && lOk && pOk && ocr;
   $('btn-dl').innerHTML = all ? ico('check') + ' Everything downloaded' : ico('download') + ' Download now';
-  $('dlstat').innerHTML = `<div class="dlrow">${ico(pct >= 98 ? 'check' : 'download')} Terrain map <b>${pct}%</b></div><div class="dlrow">${ico(c.photoPlaces >= LM.length - 3 ? 'check' : 'download')} Landmark photos <b>${c.photoPlaces} of ${LM.length}</b></div><div class="dlrow">${ico(c.placePhotos >= c.placeTotal - 5 ? 'check' : 'download')} Stop &amp; hotel photos <b>${c.placePhotos} of ${c.placeTotal}</b></div><div class="dlrow">${ico(ocr ? 'check' : 'download')} Sign reader <b>${ocr ? 'ready' : 'not yet'}</b></div>`;
+  $('dlstat').innerHTML = `<div class="dlrow">${ico(tOk ? 'check' : 'download')} Terrain map <b>${pct}%</b></div><div class="dlrow">${ico(lOk ? 'check' : 'download')} Landmark photos <b>${c.lmPhotos} of ${c.lmTotal}</b></div><div class="dlrow">${ico(pOk ? 'check' : 'download')} Stop &amp; hotel photos <b>${c.placePhotos} of ${c.placeTotal}</b></div><div class="dlrow">${ico(ocr ? 'check' : 'download')} Sign reader <b>${ocr ? 'ready' : 'not yet'}</b></div>`;
   S.dlAll = all; offlineBadge();
   return all;
 }
@@ -1022,7 +1024,7 @@ function offlineBadge() {
   else { b.textContent = '✓ Fully offline'; b.className = 'netbadge ok'; }
 }
 $('netbadge').onclick = (e) => { e.stopPropagation(); show('help'); setTimeout(() => $('dlcard').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); };
-const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'offline.js', 'icons.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'photos.js', 'offline.js', 'icons.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 async function offlineStatus() {
   const b = $('netbadge');
   try {
