@@ -61,6 +61,12 @@
       <div id="lm-sub" class="sub">—</div>
     </div>
 
+    <div class="card tap hidden" id="tonightcard">
+      <div class="lbl">🛏 Tonight's stay</div>
+      <div id="tonight-name" class="mid">—</div>
+      <div id="tonight-sub" class="sub">—</div>
+    </div>
+
     <div class="card">
       <div class="lbl">Closest to you</div>
       <div id="closest" class="closest"></div>
@@ -89,6 +95,7 @@
         <button id="m-all" class="mbtn">⤢</button>
       </div>
       <div id="maplegend" class="maplegend">
+        <label><input type="checkbox" id="terrainchk" checked> ⛰</label>
         <label><input type="checkbox" data-cat="0" checked> 🍜</label>
         <label><input type="checkbox" data-cat="2" checked> 🏪</label>
         <label><input type="checkbox" data-cat="3" checked> 🛏</label>
@@ -96,7 +103,7 @@
         <label><input type="checkbox" data-cat="5" checked> 🚻</label>
         <label><input type="checkbox" data-cat="1"> ☕</label>
       </div>
-      <div id="mapnote" class="mapnote">Blue line = bike path · 🔴 = stamp booth · ⭐ = landmark. Zoom in to see food, stores, beds.</div>
+      <div id="mapnote" class="mapnote">Blue line = bike path · 🔴 stamp booth · ⭐ landmark · 📸 photo spot · ⛰ terrain. Zoom in for food, stores, beds.</div>
     </div>
   </section>
 
@@ -104,10 +111,15 @@
   <section id="v-signs" class="view">
     <div class="card">
       <h2>Read a Korean sign</h2>
+      <label class="btn big primary camerabtn">📷 Take a photo of the sign
+        <input id="signphoto" type="file" accept="image/*" capture="environment" hidden>
+      </label>
+      <div id="photobox" class="hidden"><img id="signimg" alt="your photo"><div id="ocrstate" class="sub"></div></div>
+      <p class="sub" style="margin:10px 0 2px">Or type / scan the words:</p>
       <ol class="steps">
-        <li>Tap the box below.</li>
-        <li>Tap <b>Scan Text</b> (the little <span class="scanicon">[⌸]</span> icon, or press-and-hold the box → <b>Scan Text</b>).</li>
-        <li>Point the camera at the sign, then tap <b>Insert</b>.</li>
+        <li>Tap the box below, then tap it <b>again</b>.</li>
+        <li>In the little menu tap <b>Scan Text</b> (newer iPhones: <b>AutoFill → Scan Text</b>).</li>
+        <li>Point at the sign, tap <b>Insert</b>.</li>
       </ol>
       <textarea id="signtext" rows="3" placeholder="Tap here, then Scan Text…" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
       <div class="grid2">
@@ -130,6 +142,7 @@
 
   <!-- NEARBY -->
   <section id="v-near" class="view">
+    <input id="search" type="search" placeholder="🔍 Search: chicken, motel, bike shop, 신륵사…" autocomplete="off">
     <div class="chips" id="chips">
       <button data-cat="0" class="chip on">🍜 Food</button>
       <button data-cat="2" class="chip">🏪 Store</button>
@@ -137,6 +150,8 @@
       <button data-cat="4" class="chip">🔧 Bike shop</button>
       <button data-cat="5" class="chip">🚻 Toilet</button>
       <button data-cat="1" class="chip">☕ Café</button>
+      <button data-cat="7" class="chip">🚴 Rider stops</button>
+      <button data-cat="8" class="chip">📸 Photo spots</button>
       <button data-cat="6" class="chip">⭐ Sights</button>
       <button data-cat="9" class="chip">🏥 Hospital</button>
     </div>
@@ -157,6 +172,21 @@
 
   <!-- HELP -->
   <section id="v-help" class="view">
+    <div class="card" id="dlcard">
+      <h2>⬇️ Download for offline</h2>
+      <p class="sub">Terrain map, landmark photos and the sign reader. Do this once on wifi (≈ 40 MB).</p>
+      <div id="dlstat" class="sub"></div>
+      <div class="progress"><div id="dlbar"></div></div>
+      <button class="btn primary big" id="btn-dl">Download now</button>
+    </div>
+    <div class="card">
+      <h2>🎨 Look</h2>
+      <div class="grid3" id="themes">
+        <button class="btn" data-theme="clean">Clean</button>
+        <button class="btn" data-theme="sun">Bright sun</button>
+        <button class="btn" data-theme="night">Night</button>
+      </div>
+    </div>
     <div class="card sos">
       <h2>Emergency</h2>
       <a class="btn big red" href="tel:119">🚑 119 Ambulance / Fire</a>
@@ -189,6 +219,7 @@
         <li>Allow <b>Location</b> (Settings → Privacy → Location Services).</li>
         <li><b>Translate</b> app: download <b>Korean</b> and <b>English</b> for offline use.</li>
         <li>Settings → General → Language &amp; Region → <b>Live Text</b> on.</li>
+        <li>Help tab → <b>Download now</b> (terrain, photos, sign reader).</li>
         <li>Install <b>Organic Maps</b> and download the South Korea map (street map + hospitals, offline).</li>
         <li>Bring a power bank. GPS uses battery.</li>
       </ol>
@@ -221,6 +252,8 @@
 
 <script src="data.js"></script>
 <script src="words.js"></script>
+<script src="food.js"></script>
+<script src="offline.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -90,8 +90,42 @@ $('show-x').onclick = () => $('show').classList.add('hidden');
 const omMap = (lat, lng, name) => `om://map?v=1&ll=${lat.toFixed(6)},${lng.toFixed(6)}&n=${encodeURIComponent(name || 'Here')}`;
 const omSearch = (q) => { const h = here(); const ll = h ? `cll=${h.lat.toFixed(5)},${h.lng.toFixed(5)}&` : ''; return `om://search?${ll}query=${encodeURIComponent(q)}&locale=en`; };
 
+const PHOTO = {
+  'Jeongseojin (Start Line)': 'Sunset through the big ring sculpture. A great "day 1" photo.',
+  'Ara Maru Sky Walk': 'Stand on the glass floor and shoot straight down at the canal.',
+  'Floating Islands & Rainbow Fountain': 'Come at dusk: lit-up islands and the bridge fountain (warmer months).',
+  'Lotte World Tower': 'Best from the riverside path a little before the Gwangnaru booth.',
+  'Dumulmeori (Two Rivers Meet)': 'Early morning mist on the water and the big old tree.',
+  'Pasaseong Fortress': 'Top of the wall looking down on Ipo Weir and the river.',
+  'Silleuksa Temple': 'The pagoda on the rocks with the river behind it.',
+  'Jungangtap Central Pagoda': 'Stone pagoda with the lawn and river in the background.',
+  'Suju Palbong Rocks': 'The row of rocky peaks from across the stream.',
+  'Ihwaryeong Pass (Highest Point)': 'You made it to the top! Selfie at the summit sign, then the valley view.',
+  'Mungyeong Saejae Park': 'The old stone gate with mountains behind it.',
+  'Gyeongcheondae Lookout': 'The big bend of the Nakdong River from the cliff top.',
+  'The ARC & Gangjeong Weir': 'The round ARC building at sunset, shot from the weir bridge.',
+  'Dodong Seowon Academy': 'The giant ginkgo tree. Bright yellow in late autumn.',
+  'Namji Canola Fields': 'Endless yellow flowers in April, the river beside them.',
+  'Nakdong Rail Park & Wine Cave': 'Old iron railway bridge over the river.',
+  'Imgyeongdae Pavilion': 'Pavilion roof framing the wide lower river.',
+  'Nakdong Estuary Barrage (FINISH)': 'Finish-line photo with your stamped passport. Sunset over the estuary.'
+};
+const LMI = LM.map((l, i) => i);
+const isPhotoSpot = (l) => !!PHOTO[l.en];
+const gmaps = (name, lat, lng) => `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat.toFixed(5)},${lng.toFixed(5)},17z`;
+const nmaps = (name, lat, lng) => `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${lng.toFixed(5)},${lat.toFixed(5)},16,0,0,0,dh`;
+const descOf = (p) => (window.FOOD ? window.FOOD.describe(p.name, p.cat) : { en: p.name, type: null, emoji: '' });
+async function fillPhotos(el, en) {
+  if (!window.OFFLINE) return;
+  el.innerHTML = '<div class="sub">Loading photos…</div>';
+  const ph = await window.OFFLINE.photos(en);
+  if (!ph.length) { el.innerHTML = `<div class="sub">${navigator.onLine ? 'No photos found.' : 'Photos not downloaded yet. Help → Download now (on wifi).'}</div>`; return; }
+  el.innerHTML = `<div class="gal">${ph.map((p, i) => `<img src="${p.url}" data-i="${i}" alt="">`).join('')}</div><div class="credit">Photos via Wikimedia Commons: ${ph.map((p) => esc(p.credit) + (p.lic ? ' (' + esc(p.lic) + ')' : '')).join(' · ')}</div>`;
+  el.querySelectorAll('img').forEach((im) => im.onclick = () => { $('show-ko').innerHTML = `<img class="bigimg" src="${im.src}">`; $('show-en').textContent = ph[+im.dataset.i].credit + ' · Wikimedia Commons'; $('show').classList.remove('hidden'); });
+}
+
 function placeSheet(o) {
-  // o: {name, ko, cat, lat, lng, phone, desc, km}
+  // o: {name, ko, cat, lat, lng, phone, desc, km, en, lmEn}
   const h = here();
   let rel = '';
   if (h) {
@@ -100,16 +134,32 @@ function placeSheet(o) {
   }
   const km = o.km != null ? o.km : kmAt(o.lat, o.lng);
   const off = nearestOnPath(o.lat, o.lng).d;
-  const catLine = CAT[o.cat] ? `${CAT[o.cat].e} ${CAT[o.cat].n}` : '';
-  sheet(`<div class="lbl">${catLine}</div><h3>${esc(o.name)}</h3>${o.ko && o.ko !== o.name ? `<div class="ko">${esc(o.ko)}</div>` : ''}
+  const biz = [0, 1, 2, 3, 4, 5].includes(o.cat);
+  const dsc = biz ? descOf(o) : null;
+  const catLine = CAT[o.cat] ? `${CAT[o.cat].e} ${CAT[o.cat].n}` : (o.cat === -1 ? '🔴 Stamp booth' : '');
+  const tip = o.lmEn && PHOTO[o.lmEn];
+  sheet(`<div class="lbl">${catLine}</div><h3>${esc(o.name)}</h3>
+    ${biz && dsc.en !== o.name ? `<div class="en">${esc(dsc.en)}</div>` : ''}
+    ${o.ko && o.ko !== o.name ? `<div class="ko">${esc(o.ko)}</div>` : ''}
+    ${dsc && dsc.type ? `<div class="typ">${dsc.emoji} ${esc(dsc.type)}${dsc.chain ? '' : ' <span class="fine">(guessed from the name)</span>'}</div>` : ''}
     ${rel}<div class="sub">≈ km ${Math.round(km)} of the route${off > 0.15 ? ` · ${fmtD(off)} off the bike path` : ' · right by the bike path'}</div>
+    ${o.lmEn ? '<div id="sheetphotos" class="photos"></div>' : ''}
+    ${tip ? `<div class="tip">📸 <b>Photo tip:</b> ${esc(tip)}</div>` : ''}
     ${o.desc ? `<p class="desc">${esc(o.desc)}</p>` : ''}
     ${o.phone ? `<a class="btn" href="tel:${esc(o.phone.replace(/[^0-9+]/g, ''))}">📞 Call ${esc(o.phone)}</a>` : ''}
-    <button class="btn primary" data-act="maphere">🗺 Show on map</button>
+    ${o.cat === 3 ? '<button class="btn primary" data-act="tonight">🛏 Save as tonight\'s stay</button><button class="btn" data-act="bikein">🗣️ Ask: "Room for 1? Bike inside OK?"</button>' : ''}
+    <button class="btn ${o.cat === 3 ? '' : 'primary'}" data-act="maphere">🗺 Show on map</button>
     <button class="btn" data-act="showko">🗣️ Show a local: "I want to go here"</button>
+    ${biz ? `<div class="online"><div class="lbl">Photos, menu &amp; reviews (needs internet)</div>
+      <div class="grid2"><a class="btn" href="${gmaps(o.name, o.lat, o.lng)}">Google Maps<br><span class="fine">reviews auto-translated</span></a>
+      <a class="btn" href="${nmaps(o.name, o.lat, o.lng)}">Naver Map<br><span class="fine">most Korean reviews</span></a></div></div>` : ''}
     <a class="btn" href="${omMap(o.lat, o.lng, o.ko || o.name)}">Open in Organic Maps (streets)</a>`);
-  $('sheet-body').querySelector('[data-act=maphere]').onclick = () => { closeSheet(); show('map'); MapV.goto(o.lat, o.lng, 15); };
-  $('sheet-body').querySelector('[data-act=showko]').onclick = () => showCard(`${o.ko || o.name}\n여기에 가고 싶어요. 어느 쪽이에요?`, `"${o.name}" — I want to go here. Which way is it?`);
+  const sb = $('sheet-body');
+  sb.querySelector('[data-act=maphere]').onclick = () => { closeSheet(); show('map'); MapV.goto(o.lat, o.lng, 15); };
+  sb.querySelector('[data-act=showko]').onclick = () => showCard(`${o.ko || o.name}\n여기에 가고 싶어요. 어느 쪽이에요?`, `"${dsc ? dsc.en : o.name}" — I want to go here. Which way is it?`);
+  const tn = sb.querySelector('[data-act=tonight]'); if (tn) tn.onclick = () => { store.set('tonight', { name: o.name, en: dsc.en, lat: o.lat, lng: o.lng, phone: o.phone || '' }); $('c-hotel').value = o.name; store.set('c_hotel', o.name); tn.textContent = '✅ Saved as tonight\'s stay'; renderTonight(); };
+  const bi = sb.querySelector('[data-act=bikein]'); if (bi) bi.onclick = () => showCard('오늘 밤 1명 묵을 방 있어요?\n자전거를 방이나 안에 둘 수 있어요?', '"Do you have a room for one tonight? Can I keep my bike in the room or inside?"');
+  if (o.lmEn) fillPhotos($('sheetphotos'), o.lmEn);
 }
 function stopSheet(c) {
   const lms = LM.filter((l) => l.km >= c.km && l.km < (C[c.n] ? C[c.n].km : 9999));
@@ -192,6 +242,7 @@ function update() {
   const now = Date.now();
   if (now - lastClosest > 8000 || S.sim) { lastClosest = now; renderClosest(); }
   $('gps-meta').textContent = S.sim ? '' : `Last GPS fix ${new Date(h.t || now).toLocaleTimeString()}`;
+  renderTonight();
   if (S.view === 'map') MapV.redrawSoon();
   if (S.view === 'near') renderNear(true);
 }
@@ -214,7 +265,7 @@ function renderClosest() {
   $('closest').querySelectorAll('div').forEach((d) => d.onclick = () => { S.nearCat = +d.dataset.cat; setChip(); show('near'); });
 }
 $('nextcard').onclick = () => S.info?.nextStop && stopSheet(S.info.nextStop);
-$('lmcard').onclick = () => { const l = S.info?.nextLm; if (l) placeSheet({ name: l.en, ko: l.ko, cat: 6, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km }); };
+$('lmcard').onclick = () => { const l = S.info?.nextLm; if (l) placeSheet({ name: l.en, ko: l.ko, cat: 6, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, lmEn: l.en }); };
 $('btn-stops').onclick = () => show('route');
 $('btn-dir').onclick = () => { S.toBusan = !S.toBusan; store.set('toBusan', S.toBusan); dirLabel(); update(); };
 function dirLabel() { $('btn-dir').textContent = S.toBusan ? 'Busan (south) — tap to switch' : 'Seoul (north) — tap to switch'; }
@@ -257,16 +308,58 @@ function drawArrow() {
 
 // ---------- nearby ----------
 function setChip() { document.querySelectorAll('#chips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.cat === S.nearCat)); }
-document.querySelectorAll('#chips .chip').forEach((c) => c.onclick = () => { S.nearCat = +c.dataset.cat; setChip(); renderNear(); });
+document.querySelectorAll('#chips .chip').forEach((c) => c.onclick = () => { S.nearCat = +c.dataset.cat; $('search').value = ''; setChip(); renderNear(); });
 let lastNear = 0;
 function miniArrow(b) { return `<span style="display:inline-block;transform:rotate(${Math.round(S.heading != null ? b - S.heading : b)}deg);font-size:26px">⬆</span>`; }
+function itemRow(o, h, myKm, i) {
+  const b = bearing(h.lat, h.lng, o.lat, o.lng), k = o.km != null ? o.km : kmAt(o.lat, o.lng);
+  const diff = (k - myKm) * (S.toBusan ? 1 : -1);
+  const rel = Math.abs(diff) < 1 ? 'right around you' : diff > 0 ? `≈ ${Math.round(diff)} km ahead on route` : `≈ ${Math.round(-diff)} km behind you`;
+  let line2 = '';
+  if ([0, 1, 2, 3, 4, 5].includes(o.cat)) { const d = descOf(o); line2 = `<i>${d.emoji || CAT[o.cat].e} ${esc(d.en !== o.name ? d.en : '')}${d.en !== o.name && d.type ? ' · ' : ''}${esc(d.type || '')}</i>`; }
+  else if (o.sub) line2 = `<i>${esc(o.sub)}</i>`;
+  return `<div class="place" data-i="${i}"><div class="pa">${miniArrow(b)}<div>${DIRS[card8(b)].replace('north', 'N').replace('south', 'S').replace('east', 'E').replace('west', 'W')}</div></div>
+    <div class="pn"><b>${esc(o.name)}</b>${line2}<span>${rel}</span></div><div class="pd">${fmtD(o.d)}</div></div>`;
+}
+const lmItem = (l, h) => ({ name: l.en, ko: l.ko, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, cat: 6, lmEn: l.en, sub: (PHOTO[l.en] ? '📸 ' : '⭐ ') + l.ko, d: h ? hav(h.lat, h.lng, l.lat, l.lng) : 0 });
+const stopItem = (c, h) => ({ name: `Stop ${c.n}: ${c.en}`, ko: c.ko, lat: c.lat, lng: c.lng, km: c.km, cat: -1, stop: c, sub: `🔴 ${c.ko} stamp booth${c.staffed ? ' (staffed)' : ''} — every rider stops here`, d: h ? hav(h.lat, h.lng, c.lat, c.lng) : 0 });
+function openItem(o) { if (o.stop) stopSheet(o.stop); else placeSheet(o); }
+let SEARCH_IDX = null;
+function buildSearch() {
+  if (SEARCH_IDX) return SEARCH_IDX;
+  SEARCH_IDX = P.map((p) => { const d = window.FOOD.describe(p[3], p[2]); return (p[3] + ' ' + d.en + ' ' + (d.type || '') + ' ' + CAT[p[2]].n + ' ' + CAT[p[2]].ko).toLowerCase(); });
+  return SEARCH_IDX;
+}
+const SYN = { hotel: 'sleep', motel: 'sleep', bed: 'sleep', room: 'sleep', hostel: 'sleep', repair: 'bike shop', bicycle: 'bike shop', mechanic: 'bike shop', tire: 'bike shop', bathroom: 'toilet', restroom: 'toilet', wc: 'toilet', coffee: 'café', cafe: 'café', store: 'convenience', shop: 'convenience', mart: 'convenience', bbq: 'bbq', meat: 'bbq', soup: 'soup', noodle: 'noodle', fish: 'fish', chinese: 'chinese', pizza: 'pizza', burger: 'burger', bakery: 'bakery', bread: 'bakery', chicken: 'chicken' };
+function doSearch(q, h) {
+  const words = q.toLowerCase().trim().split(/\s+/).filter(Boolean).map((w) => SYN[w] || w);
+  if (!words.length) return null;
+  const idx = buildSearch(), res = [];
+  for (let i = 0; i < P.length; i++) if (words.every((w) => idx[i].includes(w))) res.push(i);
+  const items = res.map((i) => { const p = P[i]; return { name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat: p[2] }; });
+  LM.forEach((l) => { const t = (l.en + ' ' + l.ko + ' ' + l.desc + ' sight landmark photo').toLowerCase(); if (words.every((w) => t.includes(w))) items.push(lmItem(l, h)); });
+  C.forEach((c) => { const t = (c.en + ' ' + c.ko + ' stop stamp booth').toLowerCase(); if (words.every((w) => t.includes(w))) items.push(stopItem(c, h)); });
+  (window.TOWNS || []).forEach(([ko, en, km]) => { if (words.every((w) => (ko + ' ' + en).toLowerCase().includes(w))) { const c = C.reduce((a, b) => Math.abs(b.km - km) < Math.abs(a.km - km) ? b : a); items.push({ name: en, ko, lat: c.lat, lng: c.lng, km, cat: -2, sub: `Town · ≈ km ${km} · near stop ${c.n}`, d: 0 }); } });
+  if (h) items.forEach((o) => { o.d = hav(h.lat, h.lng, o.lat, o.lng); });
+  items.sort((a, b) => h ? a.d - b.d : (a.km ?? kmAt(a.lat, a.lng)) - (b.km ?? kmAt(b.lat, b.lng)));
+  return items.slice(0, 60);
+}
 function renderNear(auto) {
   if (auto && Date.now() - lastNear < 10000) return; lastNear = Date.now();
-  const h = here(), cat = S.nearCat, list = $('nearlist');
+  const h = here(), cat = S.nearCat, list = $('nearlist'), q = $('search').value;
+  const myKm = S.info ? S.info.km : 0;
+  if (q.trim()) {
+    const items = doSearch(q, h) || [];
+    $('nearhead').textContent = items.length ? `${items.length === 60 ? '60+' : items.length} results for "${q}"${h ? ', closest first' : ''}` : `Nothing found for "${q}". Try another word (e.g. noodles, motel, bike).`;
+    const hh = h || { lat: C[0].lat, lng: C[0].lng };
+    list.innerHTML = items.map((o, i) => itemRow(o, hh, myKm, i)).join('');
+    list.querySelectorAll('.place').forEach((e) => e.onclick = () => openItem(items[+e.dataset.i]));
+    return;
+  }
   if (cat === 9) {
     $('nearhead').textContent = '';
     list.innerHTML = `<div class="card sos"><h2>🏥 Hospital / clinic</h2>
-      <p>Hurt badly or very sick? <b>Call 119</b>. The ambulance comes to you and takes you to the right hospital. It's free.</p>
+      <p>Hurt badly or very sick? <b>Call 119</b>. The ambulance comes to you and takes you to the right hospital.</p>
       <a class="btn big red" href="tel:119">🚑 Call 119</a>
       <a class="btn big" href="tel:+8221330">📞 1330 English interpreter</a>
       <a class="btn big primary" href="${omSearch('hospital')}">🔎 Find hospitals in Organic Maps</a>
@@ -277,20 +370,19 @@ function renderNear(auto) {
     return;
   }
   if (!h) { $('nearhead').textContent = 'Waiting for GPS… (or use Practice mode in Help)'; list.innerHTML = ''; return; }
-  let items;
-  if (cat === 6) items = LM.map((l) => ({ name: l.en, ko: l.ko, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, cat: 6, d: hav(h.lat, h.lng, l.lat, l.lng) })).sort((a, b) => a.d - b.d).slice(0, 25);
-  else items = nearestOf(cat, 40, h).map(({ p, d }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat, d }));
-  const myKm = S.info ? S.info.km : 0;
-  $('nearhead').textContent = `${CAT[cat].n} closest to you (straight-line distance). Tap one for details.`;
-  list.innerHTML = items.map((o, i) => {
-    const b = bearing(h.lat, h.lng, o.lat, o.lng), k = o.km != null ? o.km : kmAt(o.lat, o.lng);
-    const diff = (k - myKm) * (S.toBusan ? 1 : -1);
-    const rel = Math.abs(diff) < 1 ? 'right around you' : diff > 0 ? `≈ ${Math.round(diff)} km ahead on route` : `≈ ${Math.round(-diff)} km behind you`;
-    return `<div class="place" data-i="${i}"><div class="pa">${miniArrow(b)}<div>${DIRS[card8(b)].replace('north', 'N').replace('south', 'S').replace('east', 'E').replace('west', 'W')}</div></div>
-      <div class="pn"><b>${esc(o.name)}</b><span>${rel}</span></div><div class="pd">${fmtD(o.d)}</div></div>`;
-  }).join('') || '<p class="fine">Nothing in the list near here.</p>';
-  list.querySelectorAll('.place').forEach((e) => e.onclick = () => placeSheet(items[+e.dataset.i]));
+  let items, head;
+  if (cat === 6) { items = LM.map((l) => lmItem(l, h)).sort((a, b) => a.d - b.d).slice(0, 25); head = 'Landmarks closest to you.'; }
+  else if (cat === 8) { items = LM.filter(isPhotoSpot).map((l) => lmItem(l, h)).sort((a, b) => a.d - b.d); head = 'Best photo spots, closest first. Tap for the photo tip.'; }
+  else if (cat === 7) {
+    items = C.map((c) => stopItem(c, h)).concat((D.riders || []).map((i) => { const p = P[i]; return { name: p[3], ko: p[3], lat: p[0], lng: p[1], cat: p[2], d: hav(h.lat, h.lng, p[0], p[1]) }; }));
+    items.sort((a, b) => a.d - b.d); items = items.slice(0, 40);
+    head = 'Where other riders stop: the red stamp booths and the cafés / stores right beside the path.';
+  } else { items = nearestOf(cat, 40, h).map(({ p, d }) => ({ name: p[3], ko: p[3], lat: p[0], lng: p[1], phone: p[4], cat, d })); head = `${CAT[cat].n} closest to you (straight-line distance). Tap one for details.`; }
+  $('nearhead').textContent = head;
+  list.innerHTML = items.map((o, i) => itemRow(o, h, myKm, i)).join('') || '<p class="fine">Nothing in the list near here.</p>';
+  list.querySelectorAll('.place').forEach((e) => e.onclick = () => openItem(items[+e.dataset.i]));
 }
+$('search').addEventListener('input', () => { clearTimeout(renderNear.t); renderNear.t = setTimeout(() => renderNear(), 300); });
 
 // ---------- route ----------
 const CLIMBS = [
@@ -312,8 +404,8 @@ function renderRoute() {
     const near = c.near || {};
     html += `<div class="stop${passed ? ' passed' : ''}" data-i="${i}"><div class="t"><b>${c.n}. ${esc(c.en)}</b><span>km ${c.km}</span></div>
       <div class="ko">${esc(c.ko)}</div>
-      <div class="meta">${c.staffed ? '🟥 Staffed booth (passport) · ' : ''}within 2 km: 🍜${near[0] || 0} 🏪${near[2] || 0} 🛏${near[3] || 0}${C[i + 1] ? ` · next stop in ${C[i + 1].km - c.km} km` : ''}</div>
-      ${lms.length ? `<div class="lms">${lms.map((l) => `⭐ ${esc(l.en)} (km ${l.km})`).join('<br>')}</div>` : ''}</div>`;
+      <div class="meta">${(near[3] || 0) >= 8 ? '<span class="badge-night">🛏 Good overnight town</span> ' : ''}${c.staffed ? '🟥 Staffed booth (passport) · ' : ''}within 2 km: 🍜${near[0] || 0} 🏪${near[2] || 0} 🛏${near[3] || 0}${C[i + 1] ? ` · next stop in ${C[i + 1].km - c.km} km` : ''}</div>
+      ${lms.length ? `<div class="lms">${lms.map((l) => `${PHOTO[l.en] ? '📸' : '⭐'} ${esc(l.en)} (km ${l.km})`).join('<br>')}</div>` : ''}</div>`;
     CLIMBS.filter(([k]) => k >= c.km && k < nk).forEach(([k, t]) => { html += `<div class="climb">⛰️ km ${k}: ${t}</div>`; });
   });
   if (myKm != null && !placedMe) html += `<div class="youhere">📍 You are here · ≈ km ${Math.round(myKm)}</div>`;
@@ -433,6 +525,62 @@ simSel.onchange = () => {
 };
 $('btn-simoff').onclick = () => { simSel.value = ''; simSel.onchange(); };
 
+
+// ---------- tonight's stay ----------
+function renderTonight() {
+  const t = store.get('tonight', null), card = $('tonightcard');
+  if (!t) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  $('tonight-name').textContent = t.name; const h = here();
+  $('tonight-sub').textContent = `${t.en && t.en !== t.name ? t.en + ' · ' : ''}${h ? fmtD(hav(h.lat, h.lng, t.lat, t.lng)) + ' ' + DIRS[card8(bearing(h.lat, h.lng, t.lat, t.lng))] + ' (straight line)' : ''}`;
+}
+$('tonightcard').onclick = () => { const t = store.get('tonight', null); if (t) placeSheet({ name: t.name, ko: t.name, cat: 3, lat: t.lat, lng: t.lng, phone: t.phone }); };
+
+// ---------- sign photo ----------
+$('signphoto').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  $('photobox').classList.remove('hidden'); $('signimg').src = URL.createObjectURL(f);
+  const st = $('ocrstate');
+  st.innerHTML = '⏳ Reading the Korean… (a few seconds)';
+  try {
+    if (!window.OCR) throw new Error('no ocr');
+    if (!navigator.onLine && !(await window.OCR.available())) throw new Error('not downloaded');
+    const txt = await window.OCR.read(f);
+    if (!txt) throw new Error('empty');
+    $('signtext').value = txt; renderSign();
+    st.innerHTML = '✅ Done. Meanings are below. If something looks wrong, <b>press and hold the words in the photo → Translate</b>.';
+  } catch (err) {
+    st.innerHTML = err.message === 'not downloaded'
+      ? 'The photo reader isn\'t downloaded yet (Help → Download now). For now: <b>press and hold the words in the photo → Translate</b>.'
+      : 'Couldn\'t read it automatically. <b>Press and hold the words in the photo → Translate</b> (or Copy, then paste in the box below).';
+  }
+  e.target.value = '';
+});
+
+// ---------- downloads ----------
+async function dlStatus() {
+  if (!window.OFFLINE) return;
+  const c = await window.OFFLINE.counts(), ocr = window.OCR ? await window.OCR.available() : false;
+  const pct = Math.round((c.tiles / c.totalTiles) * 100);
+  $('dlstat').innerHTML = `⛰ Terrain: ${pct}% · 📷 Photos: ${c.photoPlaces}/${LM.length} places · 🔤 Sign reader: ${ocr ? 'ready' : 'not yet'}`;
+  $('dlbar').style.width = Math.round((pct + c.photoPlaces / LM.length * 100 + (ocr ? 100 : 0)) / 3) + '%';
+  const all = pct >= 98 && c.photoPlaces >= LM.length - 3 && ocr;
+  $('btn-dl').textContent = all ? '✅ All downloaded (tap to check again)' : 'Download now';
+  return all;
+}
+$('btn-dl').onclick = async () => {
+  if (!navigator.onLine) { $('dlstat').textContent = 'You need internet (wifi) for this one-time download.'; return; }
+  $('btn-dl').disabled = true; $('btn-dl').textContent = 'Downloading… keep the app open';
+  try {
+    await window.OFFLINE.download((p) => { $('dlbar').style.width = Math.round(p.done / p.total * 100) + '%'; $('dlstat').textContent = `${p.msg}… ${p.done}/${p.total}${p.failed ? ' (' + p.failed + ' skipped)' : ''}`; });
+  } catch (e) {}
+  $('btn-dl').disabled = false; dlStatus();
+};
+
+// ---------- themes ----------
+function setTheme(t) { document.documentElement.dataset.theme = t; store.set('theme', t); document.querySelectorAll('#themes .btn').forEach((b) => b.classList.toggle('primary', b.dataset.theme === t)); const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = getComputedStyle(document.body).getPropertyValue('--hdr').trim() || '#0b4f8a'; if (S.view === 'map') MapV.open(); }
+document.querySelectorAll('#themes .btn').forEach((b) => b.onclick = () => setTheme(b.dataset.theme));
+
 // ---------- MAP ----------
 const MapV = (() => {
   const cv = $('map'); let ctx, W = 0, H = 0, dpr = 1;
@@ -444,7 +592,9 @@ const MapV = (() => {
   const poiW = new Float64Array(P.length * 2); P.forEach((p, i) => { poiW[2 * i] = wx(p[1]); poiW[2 * i + 1] = wy(p[0]); });
   const v = { x: wx(127.9), y: wy(36.4), z: 7, follow: false, inited: false };
   const cats = new Set([0, 2, 3, 4, 5]);
-  document.querySelectorAll('#maplegend input').forEach((i) => i.onchange = () => { i.checked ? cats.add(+i.dataset.cat) : cats.delete(+i.dataset.cat); draw(); });
+  let terrainOn = store.get('terrain', true); $('terrainchk').checked = terrainOn;
+  $('terrainchk').onchange = () => { terrainOn = $('terrainchk').checked; store.set('terrain', terrainOn); draw(); };
+  document.querySelectorAll('#maplegend input[data-cat]').forEach((i) => i.onchange = () => { i.checked ? cats.add(+i.dataset.cat) : cats.delete(+i.dataset.cat); draw(); });
   const scale = () => 256 * Math.pow(2, v.z);
   const sx = (x) => (x - v.x) * scale() + W / 2, sy = (y) => (y - v.y) * scale() + H / 2;
   function resize() { dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
@@ -453,8 +603,21 @@ const MapV = (() => {
   const visible = []; // for taps
   function draw() {
     if (!ctx) return; visible.length = 0;
-    ctx.fillStyle = '#eef3ee'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--mapbg') || '#eef3ee'; ctx.fillRect(0, 0, W, H);
     const sc = scale(), pad = 40;
+    if (terrainOn && window.TERRAIN) {
+      const tz = Math.max(7, Math.min(12, Math.round(v.z))), n = 2 ** tz, tp = sc / n;
+      const x0 = Math.floor((v.x - W / 2 / sc) * n), x1 = Math.floor((v.x + W / 2 / sc) * n), y0 = Math.floor((v.y - H / 2 / sc) * n), y1 = Math.floor((v.y + H / 2 / sc) * n);
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 40) for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+        const dx = sx(x / n), dy = sy(y / n); let cvt = window.TERRAIN.get(tz, x, y, redrawSoon);
+        if (cvt) { ctx.drawImage(cvt, dx, dy, tp + 0.6, tp + 0.6); continue; }
+        for (let pz = tz - 1; pz >= 7; pz--) {
+          const sh = tz - pz, px = x >> sh, py = y >> sh, p = window.TERRAIN.get(pz, px, py, redrawSoon);
+          if (p) { const sub = p.width / (1 << sh); ctx.drawImage(p, (x - (px << sh)) * sub, (y - (py << sh)) * sub, sub, sub, dx, dy, tp + 0.6, tp + 0.6); break; }
+        }
+      }
+      if (document.documentElement.dataset.theme === 'night') { ctx.fillStyle = 'rgba(8,14,22,.5)'; ctx.fillRect(0, 0, W, H); }
+    }
     // path
     for (const pass of [0, 1]) {
       ctx.strokeStyle = pass ? '#1f78c8' : '#ffffff'; ctx.lineWidth = pass ? (v.z > 12 ? 5 : 3.5) : (v.z > 12 ? 9 : 6.5); ctx.lineJoin = ctx.lineCap = 'round';
@@ -480,7 +643,7 @@ const MapV = (() => {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     LM.forEach((l, i) => {
       const X = sx(wx(l.lng)), Y = sy(wy(l.lat)); if (X < -pad || Y < -pad || X > W + pad || Y > H + pad) return;
-      ctx.font = (v.z >= 9 ? 22 : 15) + 'px sans-serif'; ctx.fillText('⭐', X, Y);
+      ctx.font = (v.z >= 9 ? 22 : 15) + 'px sans-serif'; ctx.fillText(PHOTO[l.en] ? '📸' : '⭐', X, Y);
       if (v.z >= 11) { label(l.en, X, Y + 20, '#6b4e00'); }
       visible.push({ X, Y, kind: 'lm', i });
     });
@@ -493,6 +656,9 @@ const MapV = (() => {
       if (v.z >= 9) label(c.en, X, Y - r - 10, '#8a1414');
       visible.push({ X, Y, kind: 'stop', i });
     });
+    // tonight's stay
+    const tn = store.get('tonight', null);
+    if (tn) { const X = sx(wx(tn.lng)), Y = sy(wy(tn.lat)); ctx.font = '26px sans-serif'; ctx.fillText('🛏', X, Y); if (v.z >= 10) label("Tonight", X, Y + 20, '#5a2fc2'); visible.push({ X, Y, kind: 'tonight' }); }
     // me
     const h = here();
     if (h) {
@@ -542,7 +708,7 @@ const MapV = (() => {
     for (const f of visible) { const d = Math.hypot(f.X - X, f.Y - Y) - (f.kind === 'stop' ? 6 : f.kind === 'lm' ? 4 : 0); if (d < bd) { bd = d; best = f; } }
     if (!best) return;
     if (best.kind === 'stop') stopSheet(C[best.i]);
-    else if (best.kind === 'lm') { const l = LM[best.i]; placeSheet({ name: l.en, ko: l.ko, cat: 6, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km }); }
+    else if (best.kind === 'lm') { const l = LM[best.i]; placeSheet({ name: l.en, ko: l.ko, cat: 6, lat: l.lat, lng: l.lng, desc: l.desc, km: l.km, lmEn: l.en }); }
     else if (best.kind === 'poi') { const p = P[best.i]; placeSheet({ name: p[3], ko: p[3], cat: p[2], lat: p[0], lng: p[1], phone: p[4] }); }
     else if (best.kind === 'me') show('where');
   }
@@ -561,7 +727,7 @@ const MapV = (() => {
 })();
 
 // ---------- offline status ----------
-const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'words.js', 'food.js', 'offline.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 async function offlineStatus() {
   const b = $('netbadge');
   try {
@@ -578,6 +744,9 @@ if ('serviceWorker' in navigator) {
 } else offlineStatus();
 
 // ---------- boot ----------
+setTheme(store.get('theme', 'clean'));
+renderTonight();
+dlStatus();
 dirLabel();
 renderWordList('');
 const last = store.get('lastpos', null);
